@@ -98,6 +98,8 @@
 		d.append(
 			h("label", {class: "cs5e-field"}, h("span", null, "Rules"), U.sel([["all", "All (2014 + 2024)"], ["one", "2024 only"], ["classic", "2014 only"]], s.edition, v => app.setSetting("edition", v))),
 			h("label", {class: "ve-flex-v-center cs5e-gap-s ve-small"}, h("input", {type: "checkbox", checked: s.hoverDelay !== false, on: {change: e => app.setSetting("hoverDelay", e.target.checked)}}), "Delay hover popups (~1 second)"),
+			h("label", {class: "ve-flex-v-center cs5e-gap-s ve-small"}, h("input", {type: "checkbox", checked: s.roll20 !== false, on: {change: e => app.setSetting("roll20", e.target.checked)}}), "Send rolls to Roll20 when a Roll20 game tab is open"),
+			h("label", {class: "ve-flex-v-center cs5e-gap-s ve-small"}, h("input", {type: "checkbox", checked: s.adBlock !== false, on: {change: e => app.setSetting("adBlock", e.target.checked)}}), "Block ads on 5e.tools"),
 			h("hr"),
 			h("div", {class: "ve-small ve-muted"}, "Google sign-in in Edge/Brave/other Chromium browsers: create a “Web application” OAuth client with this redirect URI and paste its ID below."),
 			h("code", {class: "cs5e-code"}, "…"),
@@ -114,6 +116,7 @@
 		const all = await S.getSettings();
 		all[k] = v;
 		await S.setSettings(all);
+		if (k === "adBlock") { S.notifySettings().catch(() => {}); CS.applyAdCss?.(); }
 		if (st.char) { recalc(); app.rerender(); }
 	};
 

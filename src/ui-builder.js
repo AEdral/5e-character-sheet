@@ -56,6 +56,9 @@
 				U.sel([["standard", "Standard Array"], ["pointbuy", "Point Buy"], ["roll", "Rolled (4d6, drop lowest)"], ["manual", "Manual"]], s.abilityMethod, v => commit(x => { x.settings.abilityMethod = v; if (v === "standard") x.base = Object.fromEntries(CS.ABIL.map((a, i) => [a, R.STANDARD_ARRAY[i]])); if (v === "pointbuy") x.base = Object.fromEntries(CS.ABIL.map(a => [a, 8])); }))),
 			section("Hit Point Type",
 				U.sel([["fixed", "Fixed (average)"], ["manual", "Manual (rolled)"]], s.hpMethod, v => commit(x => { x.settings.hpMethod = v; }))),
+			section("Ability Score Improvements",
+				h("label", {class: "ve-flex-v-center cs5e-gap-s"}, h("input", {type: "checkbox", checked: !!s.asiByCharLevel, on: {change: e => commit(x => { x.settings.asiByCharLevel = e.target.checked; })}}),
+					"House rule: gain ASIs/feats at character levels 4, 8, 12, 16 and 19 (instead of per class level, as in the rules)")),
 			section("Optional Class Features",
 				h("label", {class: "ve-flex-v-center cs5e-gap-s"}, h("input", {type: "checkbox", checked: s.optionalFeatures !== false, on: {change: e => commit(x => { x.settings.optionalFeatures = e.target.checked; })}}),
 					"Use optional class features and expanded spell lists (Tasha's Cauldron of Everything)")),
@@ -365,12 +368,13 @@
 			const s = k.scores[a];
 			return h("div", {class: "cs5e-abil-card"},
 				h("div", {class: "cs5e-abil-card__n"}, CS.ABIL_FULL[a]),
+				h("div", {class: "cs5e-final", title: "Final score"}, h("div", {class: "cs5e-final__s"}, s.total), h("div", {class: "cs5e-final__m"}, CS.fmtMod(s.mod)), h("div", {class: "cs5e-final__l"}, "Final Score")),
 				baseInput(a),
 				h("table", {class: "cs5e-abil-card__t"}, h("tbody", null,
 					h("tr", null, h("td", null, "Base Score"), h("td", null, s.base)),
 					h("tr", {title: s.parts.join("\n")}, h("td", null, "Bonuses"), h("td", null, s.bonus ? CS.fmtMod(s.bonus) : "—")),
 					h("tr", null, h("td", null, "Other Modifier"), h("td", null, h("input", {type: "number", class: "ve-form-control ve-input-xs cs5e-num", value: c.extra[a] || 0, on: {change: e => commit(x => { x.extra[a] = Number(e.target.value) || 0; })}}))),
-					h("tr", {class: "ve-bold"}, h("td", null, "Total Score"), h("td", null, s.total)),
+					h("tr", {class: "ve-bold cs5e-total"}, h("td", null, "Total Score"), h("td", null, s.total)),
 					h("tr", {class: "ve-bold"}, h("td", null, "Modifier"), h("td", null, CS.fmtMod(s.mod))))),
 				s.parts.length ? h("div", {class: "ve-muted ve-small"}, s.parts.map(p => h("div", null, p))) : null);
 		})));
@@ -423,15 +427,16 @@
 			card.append(statHead(`${pc.cls} Spells`, h("span", {class: "ve-muted"}, `Level ${pc.level}`)));
 			card.append(h("div", {class: "cs5e-chips"},
 				chip("Spellcasting Ability", CS.ABIL_FULL[pc.abil]), chip("Spell Save DC", pc.dc), chip("Spell Attack", CS.fmtMod(pc.attack)),
-				chip("Cantrips", `${nC} / ${pc.cantrips || 0}`, pc.cantrips && nC > pc.cantrips),
-				pc.prepared != null ? chip(prepLabel, `${nL} / ${pc.prepared}`, nL > pc.prepared) : null,
-				pc.spellbook ? chip("Spellbook", `${nBook} (${pc.spellbook} from levels)`) : null,
+				chip("Cantrips Known", `${nC} / ${pc.cantrips || 0}`, pc.cantrips && nC > pc.cantrips, pc.cantrips ? left(pc.cantrips - nC) : null),
+				pc.prepared != null ? chip(prepLabel, `${nL} / ${pc.prepared}`, nL > pc.prepared, left(pc.prepared - nL)) : null,
+				pc.spellbook ? chip("Spellbook", `${nBook} spells`, false, `${pc.spellbook} free from levels`) : null,
+				granted.length ? chip("Granted (free)", granted.length, false, "don't count") : null,
 				chip("Max Spell Level", pc.maxLevel ? CS.ordinal(pc.maxLevel) : "Cantrips only")));
-			// level tabs: pick cantrips first, then 1st level, and so on
-			const st = (CS.uiState.lists[`spells:${pc.cls}:opts`] = CS.uiState.lists[`spells:${pc.cls}:opts`] || {all: false, lvl: null});
-			const topLevel = st.all ? 9 : Math.max(pc.maxLevel, 0);
-			const levels = Array.from({length: topLevel + 1}, (_, l) => l).filter(l => l > 0 || pc.cantrips);
+			// level tabs: pick cantrips first, then 1st level, and so on (higher levels are shown locked)
 			const allAvail = R.availableSpells(k, pc).filter(x => D.isAllowed(x.spell));
+			const allSpellsAt = l => l <= 9 && allAvail.some(x => x.spell.level === l);
+			const st = (CS.uiState.lists[`spells:${pc.cls}:opts`] = CS.uiState.lists[`spells:${pc.cls}:opts`] || {all: false, lvl: null});
+			const levels = Array.from({length: 10}, (_, l) => l).filter(l => (l > 0 || pc.cantrips) && (st.all || l <= Math.max(pc.maxLevel, 0) || allSpellsAt(l)));
 			if (st.lvl == null || !levels.includes(st.lvl)) st.lvl = (pc.cantrips && nC < pc.cantrips) || !levels.includes(1) ? levels[0] : 1;
 			const has = sp => mine.some(s => K(s.name, s.source) === K(sp.name, sp.source));
 			const isGranted = sp => grantedKeys.has(K(sp.name, sp.source));
@@ -451,15 +456,22 @@
 				const n = known.filter(x => x.spell.level === l).length;
 				const lim = l === 0 ? pc.cantrips : null;
 				const short = l === 0 && pc.cantrips && nC < pc.cantrips;
-				return h("button", {type: "button", class: `cs5e-lvltab ${st.lvl === l ? "cs5e-lvltab--on" : ""} ${short ? "cs5e-lvltab--todo" : ""}`, on: {click: () => { st.lvl = l; app.rerender(); }}},
-					l === 0 ? "Cantrips" : `${CS.ordinal(l)} Level`, h("span", {class: "cs5e-lvltab__n"}, lim != null ? `${n}/${lim}` : n));
+				const locked = l > Math.max(pc.maxLevel, 0);
+				const avail = allAvail.filter(x => x.spell.level === l).length;
+				return h("button", {type: "button", class: `cs5e-lvltab ${st.lvl === l ? "cs5e-lvltab--on" : ""} ${short ? "cs5e-lvltab--todo" : ""} ${locked ? "cs5e-lvltab--locked" : ""}`,
+					title: locked ? `Your ${pc.cls} level (${pc.level}) doesn't give ${CS.ordinal(l)}-level slots yet${k.classes.length > 1 ? " — with multiclassing, the spells you can learn depend on your level in this class" : ""}` : `${n} chosen of ${avail} available`,
+					on: {click: () => { st.lvl = l; app.rerender(); }}},
+					locked ? "\u{1F512} " : null, l === 0 ? "Cantrips" : `${CS.ordinal(l)} Level`, h("span", {class: "cs5e-lvltab__n"}, lim != null ? `${n}/${lim}` : `${n}`));
 			}));
 			const cur = known.filter(x => x.spell.level === st.lvl).sort((a, b) => a.spell.name.localeCompare(b.spell.name));
+			const lockedNow = st.lvl > Math.max(pc.maxLevel, 0);
 			const items = allAvail.filter(x => x.spell.level === st.lvl);
 			card.append(
 				h("div", {class: "ve-flex-v-center cs5e-gap ve-mt-2"}, lvlTabs,
-					h("label", {class: "ve-flex-v-center ve-small cs5e-gap-s"}, h("input", {type: "checkbox", checked: st.all, on: {change: e => { st.all = e.target.checked; app.rerender(); }}}), "Show levels above your maximum")),
-				h("div", {class: "cs5e-sub"}, `${st.lvl === 0 ? "Cantrips" : `${CS.ordinal(st.lvl)}-Level Spells`} \u2014 ${pc.cls}`),
+					h("label", {class: "ve-flex-v-center ve-small cs5e-gap-s"}, h("input", {type: "checkbox", checked: st.all, on: {change: e => { st.all = e.target.checked; app.rerender(); }}}), "Show every spell level")),
+				h("div", {class: "cs5e-sub"}, `${st.lvl === 0 ? "Cantrips" : `${CS.ordinal(st.lvl)}-Level Spells`} \u2014 ${pc.cls}`,
+					h("span", {class: "ve-muted ve-small"}, `${cur.length} chosen \u00b7 ${items.length} available`)),
+				lockedNow ? h("div", {class: "cs5e-warn ve-small"}, `Locked: you need a higher ${pc.cls} level to learn ${CS.ordinal(st.lvl)}-level spells (multiclass spell levels are based on each class's own level).`) : null,
 				cur.length ? h("div", {class: "cs5e-spell-known"}, cur.map(x => h("div", {class: "cs5e-spell-row"},
 					U.link("spell", x.spell),
 					x.granted ? h("span", {class: "cs5e-tag"}, x.tag) : null,
@@ -492,7 +504,8 @@
 		page.append(h("div", {class: "cs5e-next"}, U.btn("Next: Equipment →", () => app.goStep("equipment"), "ve-btn-primary")));
 		return page;
 	}
-	const chip = (l, v, warn) => h("div", {class: `cs5e-chip ${warn ? "cs5e-chip--warn" : ""}`}, h("div", {class: "cs5e-chip__v"}, v), h("div", {class: "cs5e-chip__l"}, l));
+	const chip = (l, v, warn, note) => h("div", {class: `cs5e-chip ${warn ? "cs5e-chip--warn" : ""}`}, h("div", {class: "cs5e-chip__v"}, v), h("div", {class: "cs5e-chip__l"}, l), note ? h("div", {class: "cs5e-chip__note"}, note) : null);
+	const left = n => n > 0 ? `${n} left to choose` : n === 0 ? "complete" : `${-n} too many`;
 	B.chip = chip;
 
 	/* =============================== EQUIPMENT =============================== */

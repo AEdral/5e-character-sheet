@@ -1,7 +1,7 @@
 /* Isolated-world bridge: the page-world UI talks to chrome.storage and the service worker only through here. */
 (function () {
 	const KEYS = new Set(["chars", "settings", "tombstones", "ui"]);
-	const TYPES = new Set(["auth.status", "auth.signIn", "auth.signOut", "auth.redirectUrl", "drive.list", "drive.get", "drive.save", "drive.delete"]);
+	const TYPES = new Set(["auth.status", "auth.signIn", "auth.signOut", "auth.redirectUrl", "drive.list", "drive.get", "drive.save", "drive.delete", "roll20.send", "settings.changed"]);
 	const reply = (id, ok, data, error) => window.postMessage({__cs5e: "res", id, ok, data, error}, location.origin);
 
 	window.addEventListener("message", async evt => {

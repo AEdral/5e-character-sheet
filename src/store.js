@@ -41,6 +41,8 @@
 		async signIn () { S.auth = await send("auth.signIn"); S.emit("auth"); return S.auth; },
 		async signOut () { S.auth = await send("auth.signOut"); S.emit("auth"); return S.auth; },
 		redirectUrl: () => send("auth.redirectUrl"),
+		roll20: payload => send("roll20.send", {payload}),
+		notifySettings: () => send("settings.changed"),
 
 		async all () { return (await get("chars")) || {}; },
 		async list () {

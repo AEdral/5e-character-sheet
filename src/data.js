@@ -303,7 +303,7 @@
 	};
 
 	/** Does a spell match a 5etools spell filter string, e.g. "level=1|school=E;D|class=Wizard" */
-	D.matchSpellFilter = (sp, filter) => {
+	D.matchSpellFilter = (sp, filter, {variants = false} = {}) => {
 		for (const part of String(filter || "").split("|")) {
 			const [k0, v0] = part.split("=");
 			if (!v0) continue;
@@ -311,7 +311,7 @@
 			if (k === "level" && !vals.includes(String(sp.level))) return false;
 			if (k === "school" && !vals.includes(String(sp.school).toLowerCase())) return false;
 			if (k === "class") {
-				const lst = (D.spellClasses.get(K(sp.name, sp.source)) || []).filter(c => !c.variant);
+				const lst = (D.spellClasses.get(K(sp.name, sp.source)) || []).filter(c => variants || !c.variant);
 				if (!lst.some(c => vals.includes(c.name.toLowerCase()))) return false;
 			}
 			if (k === "components & miscellaneous" && vals.includes("ritual") && !sp.meta?.ritual) return false;

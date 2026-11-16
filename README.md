@@ -10,6 +10,10 @@ A Chrome extension that adds a D&D Beyond-style character builder and character 
 - **Lists and filters work like the site's**: the same filter pills (include / exclude / ignore) and sortable columns. The **Source** filter is shared by every list. Spells are sorted by level, then by name.
 - **Hover pop-ups** on every link use the site's own hover windows and open after about 1 second. You can turn the delay off in Settings.
 - **Character sheet**: abilities, saving throws, senses, skills, proficiencies, AC, initiative, HP (heal/damage, temporary HP), death saves, hit dice, short and long rests. Tabs for Actions, Spells (with slot tracking), Inventory, Features & Traits, Background and Notes. You can print it or save it as a PDF.
+- **Dice rolls / Roll20**: click an ability, saving throw, skill, initiative, attack or spell on the sheet to roll it. Shift-click rolls with advantage, Ctrl-click with disadvantage. If a Roll20 game tab is open (`app.roll20.net/editor`), the roll is posted to its chat as a roll template, speaking as your character when Roll20 has a character with the same name. Otherwise the roll uses the 5etools dice roller. You can turn this off in *My Characters → Settings*.
+- **Spell slots** on the sheet are split into shared Spellcasting slots (multiclass table, regained on a long rest) and Pact Magic slots (regained on a short rest).
+- **Ad blocking** on 5e.tools uses network rules plus hidden ad slots. You can turn it off in Settings. Keep in mind the site is funded by these ads.
+- **Ability Score Improvements** follow the rules: they come at **class** levels (Sorcerer 6 / Cleric 6 → 2 ASIs). An optional house rule in *Home* gives them at character levels 4/8/12/16/19 instead.
 - **Saving**: characters are always saved in your browser. Once you sign in with Google, they are also saved to Google Drive, one JSON file per character in the folder "5etools Characters".
 
 ## Install
@@ -33,3 +37,6 @@ The extension only sees the Drive files it created itself (`drive.file` scope). 
 - The extension runs inside the 5e.tools page (Chrome's "MAIN" world) so it can use the site's own `Renderer`, `Parser` and `UiUtil`. A small bridge script relays storage and Google Drive requests to the extension.
 - Data is read live from `https://5e.tools/data/…`, so anything new the site adds shows up automatically.
 - Characters saved with version 1 (the Italian version) are converted automatically when you open them.
+
+## Versions
+Every release bumps the minor version in `manifest.json` and is tagged in git (`v2.2.0`, `v2.3.0`, …).

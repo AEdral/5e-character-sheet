@@ -2,16 +2,18 @@
   "manifest_version": 3,
   "name": "5etools Characters",
   "short_name": "5etools Characters",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "D&D Beyond-style character builder and sheets on 5e.tools, using the site's own data and look. Google sign-in, saved to Google Drive.",
   "permissions": [
     "identity",
-    "storage"
+    "storage",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "https://5e.tools/*",
     "https://www.googleapis.com/*",
-    "https://oauth2.googleapis.com/*"
+    "https://oauth2.googleapis.com/*",
+    "https://app.roll20.net/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -53,6 +55,7 @@
         "src/rules.js",
         "src/store.js",
         "src/styles.js",
+        "src/roll.js",
         "src/ui-core.js",
         "src/ui-choices.js",
         "src/ui-builder.js",
@@ -60,6 +63,15 @@
         "src/ui-app.js",
         "src/main.js"
       ]
+    },
+    {
+      "matches": [
+        "https://app.roll20.net/editor*"
+      ],
+      "js": [
+        "src/roll20.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "oauth2": {
@@ -69,6 +81,15 @@
       "email",
       "profile",
       "https://www.googleapis.com/auth/drive.file"
+    ]
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ads",
+        "enabled": true,
+        "path": "rules/ads.json"
+      }
     ]
   }
 }

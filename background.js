@@ -235,7 +235,28 @@ const handlers = {
 	"drive.get": ({fileId}) => driveGet(fileId),
 	"drive.save": ({char, fileId}) => driveSave(char, fileId),
 	"drive.delete": ({fileId}) => driveTrash(fileId),
+	"roll20.send": async ({payload}) => {
+		const tabs = await chrome.tabs.query({url: ["https://app.roll20.net/editor*", "https://roll20.net/editor*"]});
+		let sent = 0;
+		for (const t of tabs.slice(0, 1)) {
+			try { const r = await chrome.tabs.sendMessage(t.id, {type: "roll20.post", payload}); if (r?.ok) sent++; } catch (e) { /* tab not ready */ }
+		}
+		return {sent, tabs: tabs.length};
+	},
+	"settings.changed": async () => { await applyAdBlock(); return true; },
 };
+
+/* ---------------- Ad blocking on 5e.tools (static ruleset, can be turned off in Settings) ---------------- */
+
+async function applyAdBlock () {
+	const settings = await getSettings();
+	const on = settings.adBlock !== false;
+	try {
+		await chrome.declarativeNetRequest.updateEnabledRulesets(on ? {enableRulesetIds: ["ads"]} : {disableRulesetIds: ["ads"]});
+	} catch (e) { console.warn("ad block", e); }
+}
+chrome.runtime.onStartup.addListener(applyAdBlock);
+chrome.runtime.onInstalled.addListener(applyAdBlock);
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 	const h = handlers[msg?.type];

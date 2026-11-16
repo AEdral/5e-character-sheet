@@ -142,6 +142,29 @@ body.cs5e-noscroll{overflow:hidden!important}
 .cs5e-lvltab--todo .cs5e-lvltab__n{color:#d9534f;opacity:1;font-weight:bold}
 .cs5e-lvltab--on.cs5e-lvltab--todo .cs5e-lvltab__n{color:#fff}
 
+/* rolls */
+.cs5e-roll{cursor:pointer}
+.cs5e-roll:hover{background:rgba(0,107,196,.08)}
+tr.cs5e-roll:hover>td{background:rgba(0,107,196,.06)}
+
+/* final ability score */
+.cs5e-final{background:var(--rgb-border--statblock,#e69a28);color:#fff;border-radius:6px;text-align:center;padding:4px 0 3px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.cs5e-final__s{font-size:24px;font-weight:bold;line-height:1.1}
+.cs5e-final__m{font-size:13px;font-weight:bold;opacity:.95}
+.cs5e-final__l{font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.9}
+.cs5e-abil-card__t tr.cs5e-total td{color:var(--rgb-name)}
+
+/* slot trackers on the sheet */
+.cs5e-slotbox{border:1px solid rgba(127,127,127,.4);border-left:4px solid #337ab7;background:var(--rgb-bg);padding:5px 8px;margin:6px 0}
+.cs5e-slotbox--pact{border-left-color:#8e44ad}
+.cs5e-slotbox__h{font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+.cs5e-slotbox__row{display:flex;flex-wrap:wrap;gap:14px;margin-top:4px}
+.cs5e-slot{display:flex;align-items:center;gap:6px}
+.cs5e-slot__l{font-weight:bold;min-width:30px}
+.cs5e-slot__n{font-size:12px;color:var(--rgb-font--muted)}
+.cs5e-chip__note{font-size:11px;color:var(--rgb-font--muted);font-style:italic}
+.cs5e-lvltab--locked{opacity:.55}
+
 /* equipment */
 .cs5e-eq-grp{margin:4px 0 8px;padding-left:4px;border-left:2px solid rgba(127,127,127,.3)}
 .cs5e-eq-opt{display:flex;gap:6px;align-items:baseline;font-weight:normal;margin:2px 0}

@@ -1,0 +1,75 @@
+[
+ {
+  "id": 1,
+  "priority": 1,
+  "action": {
+   "type": "block"
+  },
+  "condition": {
+   "requestDomains": [
+    "vntsm.com",
+    "doubleclick.net",
+    "googlesyndication.com",
+    "googletagservices.com",
+    "googleadservices.com",
+    "atmtd.com",
+    "id5-sync.com",
+    "liadm.com",
+    "rubiconproject.com",
+    "cpx.to",
+    "affec.tv",
+    "ccgateway.net",
+    "fundingchoicesmessages.google.com",
+    "adnxs.com",
+    "pubmatic.com",
+    "openx.net",
+    "criteo.com",
+    "criteo.net",
+    "amazon-adsystem.com",
+    "33across.com",
+    "casalemedia.com",
+    "adsrvr.org",
+    "sharethrough.com",
+    "teads.tv",
+    "smartadserver.com",
+    "yieldmo.com",
+    "triplelift.com",
+    "3lift.com",
+    "onetag-sys.com",
+    "media.net",
+    "lijit.com",
+    "sovrn.com",
+    "gumgum.com",
+    "adform.net",
+    "rlcdn.com",
+    "connatix.com",
+    "primis.tech",
+    "indexww.com",
+    "bidswitch.net",
+    "creativecdn.com",
+    "everesttech.net",
+    "seedtag.com",
+    "outbrain.com",
+    "taboola.com",
+    "moatads.com",
+    "doubleverify.com",
+    "adsafeprotected.com",
+    "imasdk.googleapis.com"
+   ],
+   "initiatorDomains": [
+    "5e.tools"
+   ],
+   "resourceTypes": [
+    "script",
+    "xmlhttprequest",
+    "sub_frame",
+    "image",
+    "media",
+    "ping",
+    "other",
+    "stylesheet",
+    "websocket"
+   ]
+  }
+ }
+]
