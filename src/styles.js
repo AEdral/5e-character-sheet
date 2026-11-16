@@ -152,6 +152,12 @@ body.cs5e-noscroll{overflow:hidden!important}
 .cs5e-roll:hover{background:rgba(0,107,196,.08)}
 tr.cs5e-roll:hover>td{background:rgba(0,107,196,.06)}
 
+.cs5e-menu{position:fixed;z-index:1200;min-width:220px;background:var(--rgb-bg);color:var(--rgb-font);border:1px solid rgba(127,127,127,.5);border-top:3px solid var(--rgb-border--statblock);box-shadow:0 4px 16px rgba(0,0,0,.35);padding:4px 0;font-size:13px}
+.cs5e-menu__i{display:block;width:100%;text-align:left;background:none;border:0;padding:5px 12px;color:inherit;cursor:pointer}
+.cs5e-menu__i:hover{background:rgba(0,107,196,.12)}
+.cs5e-menu__sep{border-top:1px solid rgba(127,127,127,.35);margin:4px 0}
+.cs5e-menu__chk{display:flex;align-items:center;gap:4px;padding:3px 12px;font-weight:normal;margin:0;cursor:pointer}
+
 /* final ability score */
 .cs5e-final{background:var(--rgb-border--statblock,#e69a28);color:#fff;border-radius:6px;text-align:center;padding:4px 0 3px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .cs5e-final__s{font-size:24px;font-weight:bold;line-height:1.1}

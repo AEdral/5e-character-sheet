@@ -20,6 +20,7 @@
 	CS.SCHOOL = {A: "Abjuration", C: "Conjuration", D: "Divination", E: "Enchantment", V: "Evocation", I: "Illusion", N: "Necromancy", T: "Transmutation", P: "Psionic"};
 	CS.DMG = {A: "acid", B: "bludgeoning", C: "cold", F: "fire", O: "force", L: "lightning", N: "necrotic", P: "piercing", I: "poison", Y: "psychic", R: "radiant", S: "slashing", T: "thunder"};
 
+	CS.DMG_TYPES = ["acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic", "piercing", "poison", "psychic", "radiant", "slashing", "thunder"];
 	CS.mod = score => Math.floor((Number(score || 0) - 10) / 2);
 	CS.fmtMod = n => (n >= 0 ? "+" : "") + n;
 	CS.uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -69,7 +70,8 @@
 	CS.skillName = k => CS.SKILL_BY_KEY[k]?.name || CS.cap(k);
 
 	/** Source display helpers (use the site's Parser when available) */
-	CS.srcAbv = s => { try { return globalThis.Parser?.sourceJsonToAbv?.(s) || s; } catch (e) { return s; } };
-	CS.srcFull = s => { try { return globalThis.Parser?.sourceJsonToFull?.(s) || s; } catch (e) { return s; } };
+	const brewSrc = s => CS.data?.brewSources?.get(String(s).toLowerCase());
+	CS.srcAbv = s => { try { const v = globalThis.Parser?.sourceJsonToAbv?.(s); return (v && v !== s) ? v : (brewSrc(s)?.abbreviation || v || s); } catch (e) { return s; } };
+	CS.srcFull = s => { try { const v = globalThis.Parser?.sourceJsonToFull?.(s); return (v && v !== s) ? v : (brewSrc(s)?.full || v || s); } catch (e) { return s; } };
 	CS.srcClass = s => { try { return globalThis.Parser?.sourceJsonToSourceClassname?.(s) || `ve-source__${s}`; } catch (e) { return `ve-source__${s}`; } };
 })();

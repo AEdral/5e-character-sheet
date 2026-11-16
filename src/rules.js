@@ -470,6 +470,10 @@
 					const val = this.choice({section: sec, prefix: id, from, parent: null, level: f.level, feature: f.name, id, kind: "spell", filter: `level=${spLvl}|class=${ce.cls.name}`, count: 1, how: "Mystic Arcanum", label: `Mystic Arcanum (${CS.ordinal(spLvl)}-level spell)`});
 					for (const uid of (Array.isArray(val) ? val : []).slice(0, 1)) this.g.spells.push({uid, how: "Mystic Arcanum", from, ability: ce.cls.spellcastingAbility, uses: "1/long rest"});
 				}
+				// Genie patron kind (decides the Genie's Wrath damage type) when the data doesn't offer it as spell options
+				if (ce.sc?.shortName === "Genie" && !(ce.sc.additionalSpells || []).length) {
+					this.choice({section: sec, prefix: `${sec}:geniekind`, from, parent: null, level: feats.find(f => f.kind === "subclass")?.level || 1, feature: feats.find(f => f.kind === "subclass")?.name || "Genie", id: `${sec}:geniekind`, kind: "select", options: ["Dao", "Djinni", "Efreeti", "Marid"], label: "Genie Kind"});
+				}
 				// expertise
 				for (const f of feats) {
 					if (/^Expertise$/i.test(f.name)) this.expertise({section: sec, prefix: `${sec}:exp@${f.level}`, from, parent: null, level: f.level, feature: f.name}, 2, "");
@@ -722,6 +726,7 @@
 			const dmgB = numBonus(s.bonusWeapon) + numBonus(s.bonusWeaponDamage);
 			const m = mod + dmgB;
 			out.push({
+				ranged, mod, dmgBonus: m, atkBonus: pb + mod + atkB,
 				item: i, name: i.name, source: i.source, toHit: CS.fmtMod(pb + mod + atkB),
 				damage: s.dmg1 ? `${s.dmg1}${m ? CS.fmtMod(m) : ""}` : "—", dmgType: CS.DMG[s.dmgType] || "",
 				versatile: props.includes("V") && s.dmg2 ? `${s.dmg2}${m ? CS.fmtMod(m) : ""}` : null,
@@ -824,8 +829,87 @@
 			weight, carry: scores.str.total * 15,
 		};
 		calc.pending = W.choices.filter(c => isPending(c, calc)).length;
+		calc.riders = damageRiders(char, calc);
 		return calc;
 	}
+
+	/* ====================== Damage riders (features that add to rolls) ====================== */
+
+	const GENIE_TYPE = {Dao: "bludgeoning", Djinni: "thunder", Efreeti: "fire", Marid: "cold"};
+
+	/**
+	 * Bonuses that features, invocations and feats add to attacks and damage.
+	 * target: "spell" | "weapon" | "melee" | "ranged" | "any-attack"; perBeam: added to every beam/ray;
+	 * conditional: off unless ticked in the right-click menu (on by default when defaultOn).
+	 */
+	function damageRiders (char, calc) {
+		const out = [];
+		const optNames = calc.optfeatures.map(o => o.of.name.toLowerCase());
+		const featNames = calc.feats.map(f => f.feat.name.toLowerCase());
+		const has = (ce, re) => calc.features.some(f => f.cls === ce.cls.name && re.test(f.name));
+		const pcOf = name => calc.spellcasting.perClass.find(p => p.cls === name);
+		for (const ce of calc.classes) {
+			const pc = pcOf(ce.cls.name);
+			if (ce.cls.name === "Warlock" && optNames.includes("agonizing blast")) {
+				out.push({name: "Agonizing Blast", target: "spell", match: sp => /^eldritch blast$/i.test(sp.name), bonus: CS.fmtMod(calc.scores.cha.mod), perBeam: true});
+			}
+			if (ce.sc?.shortName === "Genie" && has(ce, /^Genie's Wrath$|^The Genie$|^Genie's Vessel$/)) {
+				let kind = char.choices?.[`cls${ce.i}:geniekind`];
+				const opt = char.choices?.[`cls${ce.i}:scspells>spellopt`];
+				if (!kind && opt != null) kind = (ce.sc.additionalSpells || [])[Number(opt)]?.name;
+				if (!kind && (ce.sc.additionalSpells || []).length) kind = ce.sc.additionalSpells[0].name;
+				out.push({name: "Genie's Wrath", target: "any-attack", formula: String(calc.pb), type: GENIE_TYPE[kind] || "", conditional: true, defaultOn: true, once: true, note: "once per turn"});
+			}
+			if (ce.cls.name === "Wizard" && has(ce, /^Empowered Evocation$/) && pc) {
+				out.push({name: "Empowered Evocation", target: "spell", match: sp => sp.school === "V", bonus: CS.fmtMod(calc.scores.int.mod), once: true});
+			}
+			if (ce.cls.name === "Cleric" && has(ce, /^(Potent Spellcasting|Blessed Strikes)$/) && pc) {
+				out.push({name: "Potent Spellcasting", target: "spell", match: sp => sp.level === 0, bonus: CS.fmtMod(calc.scores.wis.mod), once: true});
+			}
+			if (ce.cls.name === "Paladin" && has(ce, /^(Improved Divine Smite|Radiant Strikes)$/)) {
+				out.push({name: "Radiant Strikes", target: "melee", formula: "1d8", type: "radiant"});
+			}
+			if (ce.cls.name === "Paladin" && has(ce, /^Divine Smite$/)) {
+				out.push({name: "Divine Smite", target: "melee", formula: "2d8", type: "radiant", conditional: true, note: "+1d8 per slot level above 1st"});
+			}
+			if (ce.cls.name === "Rogue" && has(ce, /^Sneak Attack$/)) {
+				out.push({name: "Sneak Attack", target: "weapon", formula: `${Math.ceil(ce.level / 2)}d6`, type: "", conditional: true, once: true, note: "once per turn"});
+			}
+		}
+		const fighting = [...optNames, ...featNames];
+		if (fighting.includes("dueling")) out.push({name: "Dueling", target: "melee", bonus: "+2", match: (w) => !(w.props || []).some(p => /two-handed/i.test(p))});
+		if (fighting.includes("archery")) out.push({name: "Archery", target: "ranged", hit: 2});
+		const spellNames = [...char.spells.map(x => x.name), ...calc.grants.spells.map(g => String(g.uid).split("|")[0])].map(x => x.toLowerCase());
+		if (spellNames.includes("hex")) out.push({name: "Hex", target: "any-attack", formula: "1d6", type: "necrotic", conditional: true, perHit: true});
+		if (spellNames.includes("hunter's mark")) out.push({name: "Hunter's Mark", target: "weapon", formula: "1d6", type: calc.classes.some(c => c.cls.edition === "one") ? "force" : "", conditional: true, perHit: true});
+		return out;
+	}
+
+	/** Damage lines of a spell: [{formula, type}], with cantrip scaling by character level */
+	function spellDamage (sp, level) {
+		const out = [];
+		if (sp.scalingLevelDice) {
+			const sc = Array.isArray(sp.scalingLevelDice) ? sp.scalingLevelDice : [sp.scalingLevelDice];
+			for (const s of sc) {
+				let best = null;
+				for (const [lv, f] of Object.entries(s.scaling || {})) if (Number(lv) <= level) best = f;
+				if (best) out.push({formula: best, type: (String(s.label || "").match(/^(\w+) damage/i)?.[1] || sp.damageInflict?.[0] || "").toLowerCase()});
+			}
+			if (out.length) return out;
+		}
+		const txt = JSON.stringify(sp.entries || []);
+		const re = /\{@damage ([^}|]+)[^}]*\}\s*(?:(\w+) damage)?/gi;
+		let m;
+		while ((m = re.exec(txt))) {
+			const type = (m[2] || "").toLowerCase();
+			out.push({formula: m[1].trim(), type: CS.DMG_TYPES.includes(type) ? type : (sp.damageInflict?.length === 1 ? sp.damageInflict[0] : "")});
+			if (out.length >= 3) break;
+		}
+		return out;
+	}
+
+	/** Eldritch Blast beams by character level */
+	const spellBeams = (sp, level) => (/^eldritch blast$/i.test(sp.name) ? 1 + (level >= 5) + (level >= 11) + (level >= 17) : 1);
 
 	/** A choice still to be made */
 	function isPending (c, calc) {
@@ -834,7 +918,7 @@
 			case "ability": return optionSlots(c.options[Math.min(Number(v?.opt || 0), c.options.length - 1)]).some((s, i) => s.from.length > 1 && !v?.picks?.[i]);
 			case "skill": case "lang": case "tool": case "weapon": case "stl": case "expertise": case "optfeature": case "spell":
 				return !Array.isArray(v) || v.filter(Boolean).length < c.count;
-			case "save": case "spellAbility": case "feat": return !v;
+			case "save": case "spellAbility": case "feat": case "select": return !v;
 			case "asi": return false;
 			default: return false;
 		}
@@ -843,7 +927,7 @@
 	CS.rules = {
 		newChar, migrate, effRace, optionSlots, describeOption, optionBonus, tashaOptions,
 		POINT_BUY_COST, STANDARD_ARRAY, classLevel, profBonus, classEntries, classFeatureList, tableGroups, cellValue,
-		spellcasting, availableSpells, itemSnapshot, armorClass, attacks, compute, isPending, progAt, typeCode, evalFormula, findFeat,
+		spellcasting, availableSpells, damageRiders, spellDamage, spellBeams, itemSnapshot, armorClass, attacks, compute, isPending, progAt, typeCode, evalFormula, findFeat,
 		pointBuySpent: base => CS.ABIL.reduce((t, a) => t + (POINT_BUY_COST[base[a]] ?? 99), 0),
 	};
 })();

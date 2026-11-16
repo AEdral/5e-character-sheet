@@ -182,10 +182,32 @@
 				D.fetchJson("spells/sources.json").catch(() => ({})),
 			]);
 			const langs = await D.fetchJson("languages.json").catch(() => ({}));
+			// homebrew and prerelease content the user added on 5etools (e.g. partnered books such as TLotRR)
+			const brews = [];
+			for (const util of [globalThis.PrereleaseUtil, globalThis.BrewUtil2]) {
+				try {
+					const b = await Promise.race([util?.pGetBrewProcessed?.(), new Promise(r => setTimeout(() => r(null), 8000))]);
+					if (b && typeof b === "object") brews.push(b);
+				} catch (e) { console.warn("[5etools Characters] homebrew", e); }
+			}
+			const fromBrew = prop => brews.flatMap(b => Array.isArray(b[prop]) ? b[prop] : []);
+			D.brewSources = new Map();
+			for (const b of brews) for (const src of b._meta?.sources || []) if (src.json) D.brewSources.set(String(src.json).toLowerCase(), src);
+			races.race = [...(races.race || []), ...fromBrew("race")];
+			races.subrace = [...(races.subrace || []), ...fromBrew("subrace")];
+			bgs.background = [...(bgs.background || []), ...fromBrew("background")];
+			feats.feat = [...(feats.feat || []), ...fromBrew("feat")];
+			opts.optionalfeature = [...(opts.optionalfeature || []), ...fromBrew("optionalfeature")];
+			base.baseitem = [...(base.baseitem || []), ...fromBrew("baseitem")];
+			base.itemProperty = [...(base.itemProperty || []), ...fromBrew("itemProperty")];
+			items.item = [...(items.item || []), ...fromBrew("item")];
+			langs.language = [...(langs.language || []), ...fromBrew("language")];
 			progress("classes");
 			const classFiles = await Promise.all(Object.values(classIndex).map(f => D.fetchJson("class/" + f).catch(() => ({}))));
 			progress("spells");
 			const spellFiles = await Promise.all(Object.values(spellIndex).map(f => D.fetchJson("spells/" + f).catch(() => ({}))));
+			spellFiles.push({spell: fromBrew("spell")});
+			classFiles.push({class: fromBrew("class"), subclass: fromBrew("subclass"), classFeature: fromBrew("classFeature"), subclassFeature: fromBrew("subclassFeature")});
 			progress("indexing");
 
 			// Specie

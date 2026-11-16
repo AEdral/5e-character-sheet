@@ -48,7 +48,7 @@
 				U.btn("Print / PDF", () => S.print(), "ve-btn-default ve-btn-xs"),
 				U.btn("Edit Character", () => app.openBuilder(), "ve-btn-primary ve-btn-xs")));
 
-		const abil = h("div", {class: "cs5e-sheet__abils"}, CS.ABIL.map(a => h("div", {class: "cs5e-abil cs5e-roll", title: `Roll a ${CS.ABIL_FULL[a]} check (Shift: advantage, Ctrl: disadvantage)${k.scores[a].parts.length ? "\n" + k.scores[a].parts.join("\n") : ""}`, on: {click: e => CS.roll({title: `${CS.ABIL_FULL[a]} Check`, rolls: [{label: "Check", d20: k.scores[a].mod}]}, e)}},
+		const abil = h("div", {class: "cs5e-sheet__abils"}, CS.ABIL.map(a => h("div", {...CS.rollable(() => ({title: `${CS.ABIL_FULL[a]} Check`, rolls: [{label: "Check", d20: k.scores[a].mod}]})), class: "cs5e-abil cs5e-roll"},
 			h("div", {class: "cs5e-abil__n"}, CS.ABIL_FULL[a]),
 			h("div", {class: "cs5e-abil__m"}, CS.fmtMod(k.scores[a].mod)),
 			h("div", {class: "cs5e-abil__s"}, k.scores[a].total))));
@@ -66,7 +66,7 @@
 					h("div", null, h("div", {class: "cs5e-stat__l"}, "Temp"), h("input", {type: "number", class: "ve-form-control ve-input-xs cs5e-num", min: 0, value: c.hp.temp || 0, on: {change: e => commit(x => { x.hp.temp = Math.max(0, Number(e.target.value) || 0); })}}))),
 				h("div", {class: "cs5e-stat__l ve-text-center"}, "Hit Points")));
 
-		const saves = box("Saving Throws", h("div", {class: "cs5e-saves"}, CS.ABIL.map(a => h("div", {class: "cs5e-save cs5e-roll", title: "Roll saving throw", on: {click: e => CS.roll({title: `${CS.ABIL_FULL[a]} Saving Throw`, rolls: [{label: "Save", d20: k.saves[a].value}]}, e)}}, h("span", {class: `cs5e-dot ${k.saves[a].prof ? "cs5e-dot--on" : ""}`}), h("span", {class: "cs5e-save__n"}, CS.ABIL_SHORT[a]), h("b", null, CS.fmtMod(k.saves[a].value))))),
+		const saves = box("Saving Throws", h("div", {class: "cs5e-saves"}, CS.ABIL.map(a => h("div", {...CS.rollable(() => ({title: `${CS.ABIL_FULL[a]} Saving Throw`, rolls: [{label: "Save", d20: k.saves[a].value}]})), class: "cs5e-save cs5e-roll"}, h("span", {class: `cs5e-dot ${k.saves[a].prof ? "cs5e-dot--on" : ""}`}), h("span", {class: "cs5e-save__n"}, CS.ABIL_SHORT[a]), h("b", null, CS.fmtMod(k.saves[a].value))))),
 			k.resist.length ? h("div", {class: "ve-small ve-mt-1"}, h("b", null, "Resistances: "), k.resist.map(CS.cap).join(", ")) : null);
 		const senses = box("Senses",
 			h("div", {class: "cs5e-sense"}, h("b", null, k.passive.perception), " Passive Perception"),
@@ -76,17 +76,17 @@
 		const pr = k.proficiencies;
 		const profs = box("Proficiencies & Training",
 			profLine("Armor", pr.armor), profLine("Weapons", pr.weapons), profLine("Tools", [...pr.tools, c.profsExtra].filter(Boolean)), profLine("Languages", [...pr.languages, c.languagesExtra].filter(Boolean)));
-		const skills = box("Skills", h("table", {class: "cs5e-skills"}, h("tbody", null, k.skills.map(s => h("tr", {class: "cs5e-roll", title: `Roll ${s.name}`, on: {click: e => { if (e.target.closest("a")) return; CS.roll({title: `${s.name} (${CS.ABIL_SHORT[s.abil]})`, rolls: [{label: "Check", d20: s.value}]}, e); }}},
+		const skills = box("Skills", h("table", {class: "cs5e-skills"}, h("tbody", null, k.skills.map(s => h("tr", CS.rollable(() => ({title: `${s.name} (${CS.ABIL_SHORT[s.abil]})`, rolls: [{label: "Check", d20: s.value}]})),
 			h("td", null, h("span", {class: `cs5e-dot ${s.prof >= 1 ? "cs5e-dot--on" : ""} ${s.prof >= 2 ? "cs5e-dot--exp" : ""}`, title: s.prof >= 2 ? "Expertise" : s.prof ? "Proficient" : ""})),
 			h("td", {class: "ve-muted ve-small"}, CS.ABIL_SHORT[s.abil]),
 			h("td", null, U.str(`{@skill ${s.name}}`)),
 			h("td", {class: "ve-bold ve-text-right"}, CS.fmtMod(s.value)))))));
 
 		const combat = h("div", {class: "cs5e-sheet__combat"},
-			h("div", {class: "cs5e-stat cs5e-roll", title: "Roll initiative", on: {click: e => CS.roll({title: "Initiative", rolls: [{label: "Initiative", d20: k.initiative}]}, e)}}, h("div", {class: "cs5e-stat__l"}, "Initiative"), h("div", {class: "cs5e-stat__v"}, CS.fmtMod(k.initiative))),
+			h("div", {...CS.rollable(() => ({title: "Initiative", rolls: [{label: "Initiative", d20: k.initiative}]})), class: "cs5e-stat cs5e-roll"}, h("div", {class: "cs5e-stat__l"}, "Initiative"), h("div", {class: "cs5e-stat__v"}, CS.fmtMod(k.initiative))),
 			h("div", {class: "cs5e-stat cs5e-stat--shield", title: k.ac.parts.join(" + ")}, h("div", {class: "cs5e-stat__l"}, "Armor"), h("div", {class: "cs5e-stat__v"}, k.ac.value), h("div", {class: "cs5e-stat__l"}, "Class")),
 			h("div", {class: "cs5e-stat"}, h("div", {class: "cs5e-stat__l"}, "Hit Dice"), h("div", {class: "cs5e-stat__v cs5e-small-v"}, Object.entries(k.hitDice).map(([f, n]) => `${n}d${f}`).join(" + ") || "—"), h("div", {class: "cs5e-stat__l"}, `used ${t.hitDiceUsed || 0}`)),
-			h("div", {class: "cs5e-stat"}, h("div", {class: "cs5e-stat__l cs5e-roll", title: "Roll a death saving throw", on: {click: e => CS.roll({title: "Death Saving Throw", rolls: [{label: "Death Save", d20: 0}]}, e)}}, "Death Saves \u{1F3B2}"),
+			h("div", {class: "cs5e-stat"}, h("div", {...CS.rollable(() => ({title: "Death Saving Throw", rolls: [{label: "Death Save", d20: 0}]})), class: "cs5e-stat__l cs5e-roll"}, "Death Saves \u{1F3B2}"),
 				h("div", {class: "ve-small"}, "S ", [0, 1, 2].map(j => h("input", {type: "checkbox", checked: t.deathSuccess > j, on: {change: e => commit(x => { x.tracking.deathSuccess = e.target.checked ? j + 1 : j; })}}))),
 				h("div", {class: "ve-small"}, "F ", [0, 1, 2].map(j => h("input", {type: "checkbox", checked: t.deathFail > j, on: {change: e => commit(x => { x.tracking.deathFail = e.target.checked ? j + 1 : j; })}})))),
 		);
@@ -118,12 +118,14 @@
 	/* ---------------- tabs ---------------- */
 
 	function actions (c, k) {
-		const atkRoll = (a, e) => CS.roll({title: a.name, rolls: [{label: "To Hit", d20: Number(a.toHit)}, {label: `Damage${a.dmgType ? " (" + a.dmgType + ")" : ""}`, formula: a.damage.replace(/\s/g, "")}, ...(a.versatile ? [{label: "Two-handed", formula: a.versatile.replace(/\s/g, "")}] : [])], desc: [...a.props, ...a.mastery.map(m => `Mastery: ${m}`)].join(", ")}, e);
-		const rows = k.attacks.map(a => h("tr", {class: "cs5e-roll", title: "Roll attack and damage (Shift: advantage, Ctrl: disadvantage)", on: {click: e => { if (!e.target.closest("a")) atkRoll(a, e); }}},
-			h("td", null, a.source ? U.link("item", a.item, a.item.displayName || a.name) : a.name, h("div", {class: "ve-muted ve-small"}, [...a.props, ...a.mastery.map(m => `Mastery: ${m}`)].join(", "))),
-			h("td", null, a.range), h("td", {class: "ve-bold"}, a.toHit),
-			h("td", null, a.damage, " ", h("span", {class: "ve-muted"}, a.dmgType), a.versatile ? h("div", {class: "ve-muted ve-small"}, `Two-handed: ${a.versatile}`) : null)));
-		const unarmed = h("tr", {class: "cs5e-roll", on: {click: e => { if (!e.target.closest("a")) CS.roll({title: "Unarmed Strike", rolls: [{label: "To Hit", d20: k.pb + k.scores.str.mod}, {label: "Damage", formula: String(Math.max(1, 1 + k.scores.str.mod))}]}, e); }}}, h("td", null, U.str("{@action Unarmed Strike|XPHB}")), h("td", null, "5 ft."), h("td", {class: "ve-bold"}, CS.fmtMod(k.pb + k.scores.str.mod)), h("td", null, `${Math.max(1, 1 + k.scores.str.mod)} `, h("span", {class: "ve-muted"}, "bludgeoning")));
+		const rows = k.attacks.map(a => {
+			const spec = CS.weaponRollSpec(a, k);
+			return h("tr", CS.rollable(en => CS.weaponRollSpec(a, k, en), CS.conditionalRiders(k, "weapon", a)),
+				h("td", null, a.source ? U.link("item", a.item, a.item.displayName || a.name) : a.name, h("div", {class: "ve-muted ve-small"}, [...a.props, ...a.mastery.map(m => `Mastery: ${m}`)].join(", "))),
+				h("td", null, a.range), h("td", {class: "ve-bold"}, CS.fmtMod(spec.rolls[0].d20)),
+				h("td", null, CS.damageText(spec), a.versatile ? h("div", {class: "ve-muted ve-small"}, `Two-handed: ${a.versatile} ${a.dmgType}`) : null));
+		});
+		const unarmed = h("tr", CS.rollable(() => ({title: "Unarmed Strike", rolls: [{label: "To Hit", d20: k.pb + k.scores.str.mod}, {label: "Damage (bludgeoning)", formula: String(Math.max(1, 1 + k.scores.str.mod))}]})), h("td", null, U.str("{@action Unarmed Strike|XPHB}")), h("td", null, "5 ft."), h("td", {class: "ve-bold"}, CS.fmtMod(k.pb + k.scores.str.mod)), h("td", null, `${Math.max(1, 1 + k.scores.str.mod)} `, h("span", {class: "ve-muted"}, "bludgeoning")));
 		const spellAtk = k.spellcasting.perClass.length ? h("div", {class: "ve-mt-2"}, h("div", {class: "cs5e-sub"}, "Spellcasting"),
 			...k.spellcasting.perClass.map(p => h("div", {class: "ve-small"}, h("b", null, p.cls), `: spell attack ${CS.fmtMod(p.attack)}, save DC ${p.dc} (${CS.ABIL_FULL[p.abil]})`))) : null;
 		const cantrips = c.spells.filter(s => s.level === 0).map(s => D.getSpell(s)).filter(Boolean);
@@ -169,14 +171,12 @@
 				const isPact = pc?.prog === "pact";
 				const saveAb = (sp.savingThrow || [])[0];
 				const hit = (sp.spellAttack || []).length ? CS.fmtMod(pc?.attack ?? 0) : saveAb ? `${saveAb.slice(0, 3).toUpperCase()} ${pc?.dc ?? ""}` : "";
-				const dmg = CS.spellDamage(sp);
-				const rolls = [];
-				if ((sp.spellAttack || []).length) rolls.push({label: "Spell Attack", d20: pc?.attack ?? 0});
-				if (dmg) rolls.push({label: "Damage", formula: dmg.replace(/\s/g, "")});
-				return h("tr", {class: rolls.length ? "cs5e-roll" : "", title: rolls.length ? "Roll" : "", on: {click: e => { if (!rolls.length || e.target.closest("a")) return; CS.roll({title: sp.name, rolls, desc: saveAb ? `${CS.cap(saveAb)} save DC ${pc?.dc}` : ""}, e); }}},
+				const spec = CS.spellRollSpec(sp, pc, k);
+				const dmg = spec ? CS.damageText(spec) : "";
+				return h("tr", spec ? CS.rollable(en => CS.spellRollSpec(sp, pc, k, en), CS.conditionalRiders(k, "spell", sp)) : null,
 					h("td", null, U.link("spell", sp), h("div", {class: "ve-muted ve-small"}, [x.from, x.tag, l > 0 && isPact && !/Arcanum/.test(x.tag || "") ? "Pact slot" : null].filter(Boolean).join(" \u00b7 "))),
 					h("td", {class: "ve-small"}, U.spTime(sp)), h("td", {class: "ve-small"}, U.spRange(sp)),
-					h("td", {class: "ve-bold ve-small"}, hit), h("td", {class: "ve-small"}, dmg || ""),
+					h("td", {class: "ve-bold ve-small"}, hit), h("td", {class: "ve-small"}, dmg),
 					h("td", {class: "ve-small ve-muted"}, [U.isConc(sp) ? "C" : "", sp.meta?.ritual ? "R" : ""].filter(Boolean).join(" ")));
 			}))));
 		}

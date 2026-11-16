@@ -190,6 +190,9 @@
 		spellAbility (c) {
 			return h("div", {class: "cs5e-choice__row"}, U.sel([["", "— Choose —"], ...c.from.map(a => [a, CS.ABIL_FULL[a]])], c.value || "", v => setChoice(c.id, v || null)));
 		},
+		select (c) {
+			return h("div", {class: "cs5e-choice__row"}, U.sel([["", "\u2014 Choose \u2014"], ...c.options.map(o => [o, o])], c.value || "", v => setChoice(c.id, v || null)));
+		},
 		size (c) {
 			return h("div", {class: "cs5e-choice__row"}, U.sel(c.options.map(s => [s, CS.SIZE[s] || s]), c.value || c.options[0], v => setChoice(c.id, v)));
 		},
