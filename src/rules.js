@@ -460,6 +460,16 @@
 					const an = anchor(fp.name);
 					for (let j = 0; j < n; j++) this.featChoice({section: sec, prefix: `${sec}:fp`, from, parent: null, ...an}, `${sec}:fp:${fp.name}:${j}`, fp.category, fp.name);
 				}
+				// Mystic Arcanum (warlock): one spell of 6th-9th level from the class list, cast once per long rest
+				for (const f of feats) {
+					if (f.kind !== "class" || !/^Mystic Arcanum/i.test(f.name)) continue;
+					const m = f.name.match(/(\d)(?:st|nd|rd|th)/);
+					const spLvl = m ? Number(m[1]) : ({11: 6, 13: 7, 15: 8, 17: 9})[f.level];
+					if (!spLvl) continue;
+					const id = `${sec}:arcanum@${f.level}`;
+					const val = this.choice({section: sec, prefix: id, from, parent: null, level: f.level, feature: f.name, id, kind: "spell", filter: `level=${spLvl}|class=${ce.cls.name}`, count: 1, how: "Mystic Arcanum", label: `Mystic Arcanum (${CS.ordinal(spLvl)}-level spell)`});
+					for (const uid of (Array.isArray(val) ? val : []).slice(0, 1)) this.g.spells.push({uid, how: "Mystic Arcanum", from, ability: ce.cls.spellcastingAbility, uses: "1/long rest"});
+				}
 				// expertise
 				for (const f of feats) {
 					if (/^Expertise$/i.test(f.name)) this.expertise({section: sec, prefix: `${sec}:exp@${f.level}`, from, parent: null, level: f.level, feature: f.name}, 2, "");

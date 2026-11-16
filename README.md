@@ -14,7 +14,9 @@ A Chrome extension that adds a D&D Beyond-style character builder and character 
 - **Spell slots** on the sheet are split into shared Spellcasting slots (multiclass table, regained on a long rest) and Pact Magic slots (regained on a short rest).
 - **Ad blocking** on 5e.tools uses network rules plus hidden ad slots. You can turn it off in Settings. Keep in mind the site is funded by these ads.
 - **Ability Score Improvements** follow the rules: they come at **class** levels (Sorcerer 6 / Cleric 6 → 2 ASIs). An optional house rule in *Home* gives them at character levels 4/8/12/16/19 instead.
-- **Saving**: characters are always saved in your browser. Once you sign in with Google, they are also saved to Google Drive, one JSON file per character in the folder "5etools Characters".
+- **Saving (no setup)**: characters are always saved in your browser. By default they are also backed up to **your Chrome account** (`chrome.storage.sync`). Nothing to configure: if you are signed in to Chrome with sync on, your characters follow you to every computer where you install the extension. The space is about 100 KB, which is roughly 15–30 characters with a portrait. The drawer shows how much is used.
+- **Google Drive (optional)**: one JSON file per character in the folder "5etools Characters". Choose it under *My Characters → Settings → Cloud save*. It needs the one-time setup below.
+- **Portraits**: upload an image from a file (it is cropped to a small square to fit the cloud save) or paste a URL. You can also click the portrait on the sheet to change it.
 
 ## Install
 1. Unzip to a folder you will keep.
@@ -23,7 +25,7 @@ A Chrome extension that adds a D&D Beyond-style character builder and character 
 
 If you are updating from the previous version: remove the old extension first, then load this one. Your saved characters are kept in your browser storage.
 
-## Google sign-in (one-time setup)
+## Google Drive sign-in (optional, one-time setup)
 1. In https://console.cloud.google.com create a project and enable the **Google Drive API**.
 2. Set up the **OAuth consent screen**: choose External, then add yourself (and your friends) as test users.
 3. Go to **Credentials → Create OAuth client ID** and pick the type **Chrome Extension**. For the Item ID, use the extension ID shown in `chrome://extensions`.

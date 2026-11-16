@@ -38,7 +38,7 @@
 		if (open) {
 			renderDrawer();
 			if (await ensureData()) renderDrawer();
-			S.authStatus().then(a => { if (a.signedIn) sync(true); });
+			S.authStatus().then(a => { if (a.signedIn || S.cloud() === "chrome") sync(true); });
 		}
 	};
 
@@ -58,13 +58,7 @@
 			h("div", {class: "cs5e-drawer__head"},
 				h("h4", {class: "ve-m-0"}, "My Characters"),
 				U.btn(h("span", {class: "glyphicon glyphicon-remove"}), () => app.toggleDrawer(false), "ve-btn-default ve-btn-xs", {title: "Close"})),
-			h("div", {class: "cs5e-drawer__auth"},
-				a.signedIn
-					? [a.user?.picture ? h("img", {src: a.user.picture, class: "cs5e-avatar", referrerpolicy: "no-referrer"}) : null,
-						h("span", {class: "ve-small ve-muted cs5e-ellipsis"}, a.user?.email || "Signed in"),
-						U.btn(h("span", {class: "glyphicon glyphicon-refresh"}), () => sync(false), "ve-btn-default ve-btn-xs", {title: "Sync with Google Drive"}),
-						U.btn("Sign out", signOut, "ve-btn-default ve-btn-xs")]
-					: [U.btn("Sign in with Google", signIn, "ve-btn-default ve-btn-xs"), h("span", {class: "ve-muted ve-small"}, "Saved in this browser only")]),
+			h("div", {class: "cs5e-drawer__auth"}, ...cloudStatus(a)),
 			h("div", {class: "ve-flex-v-center cs5e-gap ve-mb-2"},
 				U.btn("+ Create a Character", newCharacter, "ve-btn-primary"),
 				U.btn("Import", () => fileIn.click(), "ve-btn-default"), fileIn),
@@ -80,7 +74,7 @@
 				h("div", {class: "cs5e-crow__main", on: {click: () => openChar(c, "sheet")}},
 					h("div", {class: "ve-bold"}, c.name || "Unnamed"),
 					h("div", {class: "ve-small ve-muted"}, summary(c)),
-					h("div", {class: "ve-small ve-muted"}, c._driveId && !c._dirty ? "☁ Google Drive" : S.auth.signedIn ? "Not synced yet" : "This browser")),
+					h("div", {class: "ve-small ve-muted"}, S.cloud() === "chrome" ? (c._syncDirty ? "Not synced yet" : "☁ Chrome account") : c._driveId && !c._dirty ? "☁ Google Drive" : S.auth.signedIn ? "Not synced yet" : "This browser")),
 				h("div", {class: "cs5e-crow__act"},
 					U.btn("View", () => openChar(c, "sheet"), "ve-btn-default ve-btn-xs"),
 					U.btn("Edit", () => openChar(c, "builder"), "ve-btn-default ve-btn-xs"),
@@ -92,10 +86,30 @@
 		}
 	}
 
+	function cloudStatus (a) {
+		const mode = S.cloud();
+		const syncBtn = U.btn(h("span", {class: "glyphicon glyphicon-refresh"}), () => sync(false), "ve-btn-default ve-btn-xs", {title: "Sync now"});
+		if (mode === "chrome") {
+			const u = S.syncUsage;
+			return [h("span", {class: "ve-small"}, "\u2601 Saved with your Chrome account"),
+				u ? h("span", {class: "ve-small ve-muted"}, `(${Math.round(u.bytes / 1024)} / ${Math.round(u.quota / 1024)} KB)`) : null, syncBtn,
+				S.syncError ? h("div", {class: "ve-small ve-text-danger ve-w-100"}, S.syncError) : null];
+		}
+		if (mode === "drive") {
+			return a.signedIn
+				? [a.user?.picture ? h("img", {src: a.user.picture, class: "cs5e-avatar", referrerpolicy: "no-referrer"}) : null,
+					h("span", {class: "ve-small ve-muted cs5e-ellipsis"}, a.user?.email || "Signed in"), syncBtn,
+					U.btn("Sign out", signOut, "ve-btn-default ve-btn-xs")]
+				: [U.btn("Sign in with Google", signIn, "ve-btn-default ve-btn-xs"), h("span", {class: "ve-muted ve-small"}, "Google Drive (needs the setup in the README)")];
+		}
+		return [h("span", {class: "ve-muted ve-small"}, "Saved in this browser only")];
+	}
+
 	function settingsBox () {
 		const s = D.settings;
 		const d = h("details", {class: "cs5e-drawer__settings"}, h("summary", null, "Settings"));
 		d.append(
+			h("label", {class: "cs5e-field"}, h("span", null, "Cloud save"), U.sel([["chrome", "Chrome account (automatic, no setup)"], ["drive", "Google Drive (requires setup)"], ["off", "This browser only"]], S.cloud(), async v => { await app.setSetting("cloud", v); renderDrawer(); sync(true); })),
 			h("label", {class: "cs5e-field"}, h("span", null, "Rules"), U.sel([["all", "All (2014 + 2024)"], ["one", "2024 only"], ["classic", "2014 only"]], s.edition, v => app.setSetting("edition", v))),
 			h("label", {class: "ve-flex-v-center cs5e-gap-s ve-small"}, h("input", {type: "checkbox", checked: s.hoverDelay !== false, on: {change: e => app.setSetting("hoverDelay", e.target.checked)}}), "Delay hover popups (~1 second)"),
 			h("label", {class: "ve-flex-v-center cs5e-gap-s ve-small"}, h("input", {type: "checkbox", checked: s.roll20 !== false, on: {change: e => app.setSetting("roll20", e.target.checked)}}), "Send rolls to Roll20 when a Roll20 game tab is open"),
@@ -250,28 +264,31 @@
 	const saveLocalD = CS.debounce(async () => {
 		if (!st.char) return;
 		await S.saveLocal(CS.clone(st.char));
-		setStatus(S.auth.signedIn ? "Saved · syncing…" : "Saved in this browser");
+		setStatus(S.cloud() === "chrome" || S.auth.signedIn ? "Saved \u00b7 syncing\u2026" : "Saved in this browser");
 	}, 300);
-	const saveDriveD = CS.debounce(async () => {
-		const c = st.char; if (!c || !S.auth.signedIn) return;
-		try {
-			const copy = CS.clone(c);
-			await S.pushDrive(copy);
-			if (st.char && st.char.id === copy.id) { st.char._driveId = copy._driveId; st.char._dirty = false; }
-			setStatus("☁ Saved to Google Drive");
-		} catch (e) { setStatus("⚠ Drive: " + e.message); }
-	}, 2500);
-	function saveNow () { saveLocalD.flush(); if (S.auth.signedIn && st.char?._dirty) saveDriveD.flush(); }
+	const saveCloudD = CS.debounce(async () => {
+		const c = st.char; if (!c) return;
+		const copy = CS.clone(c);
+		const done = [];
+		if (S.cloud() === "chrome") {
+			try { await S.pushChrome(copy); if (st.char?.id === copy.id && st.char.updatedAt === copy.updatedAt) st.char._syncDirty = false; done.push("Chrome account"); } catch (e) { setStatus("\u26a0 Chrome sync: " + e.message); return; }
+		}
+		if (S.auth.signedIn && S.cloud() === "drive") {
+			try { await S.pushDrive(copy); if (st.char && st.char.id === copy.id) { st.char._driveId = copy._driveId; st.char._dirty = false; } done.push("Google Drive"); } catch (e) { setStatus("\u26a0 Drive: " + e.message); return; }
+		}
+		if (done.length) setStatus(`\u2601 Saved to ${done.join(" and ")}`);
+	}, 2000);
+	function saveNow () { saveLocalD.flush(); if (st.char?._dirty || st.char?._syncDirty) saveCloudD.flush(); }
 	function setStatus (s) { st.status = s; const el = document.getElementById("cs5e-status"); if (el) el.textContent = s; }
 
 	/** Apply a change, recompute, save, re-render */
 	app.commit = (fn, {rerender = true} = {}) => {
 		fn(st.char);
 		st.char.updatedAt = Date.now();
-		st.char._dirty = true;
+		st.char._dirty = true; st.char._syncDirty = true;
 		recalc();
 		setStatus("Saving…");
-		saveLocalD(); saveDriveD();
+		saveLocalD(); saveCloudD();
 		if (rerender) app.rerender();
 	};
 

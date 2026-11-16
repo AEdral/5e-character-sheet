@@ -45,7 +45,7 @@
 				h("div", {class: "cs5e-grid2"},
 					field("Character Name", txt("name", "Name")),
 					field("Player", txt("player")),
-					field("Avatar (image URL)", txt("portrait", "https://...")),
+					field("Portrait", portraitField()),
 				)),
 			section("Sources",
 				h("p", {class: "ve-small"}, "Choose which books to use. The same Source filter is shared by every list in the builder (species, classes, backgrounds, feats, spells, items) and works like the filters on 5etools: click a book to include it, again to exclude it, again to ignore it."),
@@ -67,6 +67,39 @@
 			h("div", {class: "cs5e-next"}, U.btn("Next: Class →", () => app.goStep("class"), "ve-btn-primary")),
 		);
 	}
+
+	/** Portrait: upload from file (resized to a small square JPEG so it fits the cloud save) or paste a URL */
+	function portraitField () {
+		const c = char();
+		const fileIn = h("input", {type: "file", accept: "image/*", class: "cs5e-hidden", on: {change: async e => {
+			const f = e.target.files?.[0]; if (!f) return;
+			try { const url = await B.resizeImage(f, 192); commit(x => { x.portrait = url; }); } catch (err) { alert("Could not read the image: " + err.message); }
+		}}});
+		const isData = String(c.portrait || "").startsWith("data:");
+		return h("div", {class: "ve-flex-v-center cs5e-gap"},
+			c.portrait ? h("img", {src: c.portrait, class: "cs5e-portrait-prev", referrerpolicy: "no-referrer"}) : h("div", {class: "cs5e-portrait-prev cs5e-portrait-prev--ph"}, (c.name || "?")[0]),
+			h("div", {class: "ve-flex-col cs5e-gap-s ve-grow"},
+				h("div", {class: "ve-flex-v-center cs5e-gap-s"},
+					U.btn("Upload image\u2026", () => fileIn.click(), "ve-btn-primary ve-btn-xs"), fileIn,
+					c.portrait ? U.btn("Remove", () => commit(x => { x.portrait = ""; }), "ve-btn-danger ve-btn-xs") : null),
+				h("input", {type: "text", class: "ve-form-control ve-input-xs", placeholder: "\u2026or paste an image URL", value: isData ? "" : (c.portrait || ""), on: {change: e => commit(x => { x.portrait = e.target.value.trim(); })}})));
+	}
+
+	B.resizeImage = (file, size) => new Promise((resolve, reject) => {
+		const img = new Image();
+		const url = URL.createObjectURL(file);
+		img.onload = () => {
+			const s0 = Math.min(img.width, img.height);
+			const cv = document.createElement("canvas"); cv.width = size; cv.height = size;
+			const ctx = cv.getContext("2d");
+			ctx.imageSmoothingQuality = "high";
+			ctx.drawImage(img, (img.width - s0) / 2, (img.height - s0) / 4, s0, s0, 0, 0, size, size);
+			URL.revokeObjectURL(url);
+			resolve(cv.toDataURL("image/jpeg", 0.82));
+		};
+		img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("unsupported image")); };
+		img.src = url;
+	});
 
 	const field = (label, input) => h("label", {class: "cs5e-field"}, h("span", null, label), input);
 

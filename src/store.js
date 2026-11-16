@@ -57,14 +57,26 @@
 			await set("chars", all);
 		},
 
-		/** Salva: locale subito, Drive se connesso */
+		/** where characters are backed up: "chrome" (Chrome sync, default), "drive" (Google Drive), "off" */
+		cloud: () => CS.data?.settings?.cloud || "chrome",
+
+		/** Save: locally at once, then to the cloud */
 		async save (char, {touch = true} = {}) {
 			if (touch) char.updatedAt = Date.now();
-			char._dirty = true;
+			char._dirty = true; char._syncDirty = true;
 			await S.saveLocal(char);
+			if (S.cloud() === "chrome") await S.pushChrome(char).catch(e => { S.syncError = e.message; });
 			if (S.auth.signedIn) await S.pushDrive(char);
 			S.emit("saved");
 			return char;
+		},
+
+		async pushChrome (char) {
+			await send("sync.save", {char});
+			const cur = await S.getLocal(char.id);
+			if (cur && cur.updatedAt <= char.updatedAt) { cur._syncDirty = false; await S.saveLocal(cur); }
+			char._syncDirty = false;
+			S.syncError = null;
 		},
 
 		async pushDrive (char) {
@@ -86,6 +98,7 @@
 			const all = await S.all();
 			delete all[char.id];
 			await set("chars", all);
+			if (S.cloud() === "chrome") { try { await send("sync.delete", {id: char.id}); } catch (e) { /* ignore */ } }
 			if (char._driveId) {
 				if (S.auth.signedIn) {
 					try { await send("drive.delete", {fileId: char._driveId}); } catch (e) { await S.tombstone(char._driveId); }
@@ -99,10 +112,38 @@
 			await set("tombstones", t);
 		},
 
-		/** Sincronizza in entrambe le direzioni (vince la modifica più recente) */
-		async sync () {
-			if (!S.auth.signedIn) return {pulled: 0, pushed: 0};
+		/** Two-way sync with Chrome sync storage (newest change wins) */
+		async syncChrome () {
 			let pulled = 0; let pushed = 0;
+			const r = await send("sync.list");
+			S.syncUsage = {bytes: r.bytes, quota: r.quota};
+			const all = await S.all();
+			for (const id of r.tombs) if (all[id] && !all[id]._syncDirty) delete all[id];
+			const remote = new Map(r.chars.map(c => [c.id, c]));
+			for (const m of r.chars) {
+				const local = all[m.id];
+				if (!local || (!local._syncDirty && m.u > (local.updatedAt || 0) + 500)) {
+					try {
+						const c = await send("sync.get", {id: m.id});
+						if (c) { c._syncDirty = false; if (local?._driveId) c._driveId = local._driveId; all[m.id] = c; pulled++; }
+					} catch (e) { console.warn("[5etools Characters] sync get", e); }
+				}
+			}
+			await set("chars", all);
+			for (const c of Object.values(all)) {
+				if (c._syncDirty || !remote.has(c.id)) {
+					try { await S.pushChrome(c); pushed++; } catch (e) { S.syncError = e.message; console.warn("[5etools Characters] sync", e); }
+				}
+			}
+			try { const r2 = await send("sync.list"); S.syncUsage = {bytes: r2.bytes, quota: r2.quota}; } catch (e) { /* ignore */ }
+			return {pulled, pushed};
+		},
+
+		/** Sync everything that is enabled */
+		async sync () {
+			let pulled = 0; let pushed = 0;
+			if (S.cloud() === "chrome") { const r = await S.syncChrome(); pulled += r.pulled; pushed += r.pushed; }
+			if (!S.auth.signedIn) { S.emit("list"); return {pulled, pushed}; }
 			const tomb = (await get("tombstones")) || [];
 			for (const fileId of tomb) { try { await send("drive.delete", {fileId}); } catch (e) { /* già eliminato */ } }
 			await set("tombstones", []);

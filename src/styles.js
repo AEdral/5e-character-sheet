@@ -142,6 +142,11 @@ body.cs5e-noscroll{overflow:hidden!important}
 .cs5e-lvltab--todo .cs5e-lvltab__n{color:#d9534f;opacity:1;font-weight:bold}
 .cs5e-lvltab--on.cs5e-lvltab--todo .cs5e-lvltab__n{color:#fff}
 
+/* portrait */
+.cs5e-portrait-prev{width:72px;height:72px;border-radius:6px;object-fit:cover;border:2px solid var(--rgb-border--statblock);flex:none}
+.cs5e-portrait-prev--ph{display:flex;align-items:center;justify-content:center;font:700 30px Convergence,sans-serif;color:var(--rgb-name);background:var(--rgb-bg--alt)}
+.cs5e-sheet__avatar{cursor:pointer}
+
 /* rolls */
 .cs5e-roll{cursor:pointer}
 .cs5e-roll:hover{background:rgba(0,107,196,.08)}

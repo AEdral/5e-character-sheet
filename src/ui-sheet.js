@@ -32,7 +32,12 @@
 		};
 
 		const header = h("div", {class: "cs5e-sheet__head"},
-			c.portrait ? h("img", {class: "cs5e-sheet__avatar", src: c.portrait, referrerpolicy: "no-referrer"}) : h("div", {class: "cs5e-sheet__avatar cs5e-sheet__avatar--ph"}, (c.name || "?")[0]),
+			(() => {
+				const fileIn = h("input", {type: "file", accept: "image/*", class: "cs5e-hidden", on: {change: async e => { const f = e.target.files?.[0]; if (f) { const url = await B.resizeImage(f, 192); commit(x => { x.portrait = url; }); } }}});
+				const av = c.portrait ? h("img", {class: "cs5e-sheet__avatar", src: c.portrait, referrerpolicy: "no-referrer", title: "Click to change the portrait"}) : h("div", {class: "cs5e-sheet__avatar cs5e-sheet__avatar--ph", title: "Click to upload a portrait"}, (c.name || "?")[0]);
+				av.addEventListener("click", () => fileIn.click());
+				return h("span", null, av, fileIn);
+			})(),
 			h("div", {class: "cs5e-sheet__who"},
 				h("h1", {class: "ve-stats__h-name ve-m-0"}, c.name || "Unnamed"),
 				h("div", null, [k.race?.displayName, cls].filter(Boolean).join(" · ") || "—"),
@@ -169,7 +174,7 @@
 				if ((sp.spellAttack || []).length) rolls.push({label: "Spell Attack", d20: pc?.attack ?? 0});
 				if (dmg) rolls.push({label: "Damage", formula: dmg.replace(/\s/g, "")});
 				return h("tr", {class: rolls.length ? "cs5e-roll" : "", title: rolls.length ? "Roll" : "", on: {click: e => { if (!rolls.length || e.target.closest("a")) return; CS.roll({title: sp.name, rolls, desc: saveAb ? `${CS.cap(saveAb)} save DC ${pc?.dc}` : ""}, e); }}},
-					h("td", null, U.link("spell", sp), h("div", {class: "ve-muted ve-small"}, [x.from, x.tag, l > 0 && isPact ? "Pact slot" : null].filter(Boolean).join(" \u00b7 "))),
+					h("td", null, U.link("spell", sp), h("div", {class: "ve-muted ve-small"}, [x.from, x.tag, l > 0 && isPact && !/Arcanum/.test(x.tag || "") ? "Pact slot" : null].filter(Boolean).join(" \u00b7 "))),
 					h("td", {class: "ve-small"}, U.spTime(sp)), h("td", {class: "ve-small"}, U.spRange(sp)),
 					h("td", {class: "ve-bold ve-small"}, hit), h("td", {class: "ve-small"}, dmg || ""),
 					h("td", {class: "ve-small ve-muted"}, [U.isConc(sp) ? "C" : "", sp.meta?.ritual ? "R" : ""].filter(Boolean).join(" ")));

@@ -213,6 +213,69 @@ async function driveTrash (fileId) {
 	});
 }
 
+/* ---------------- Chrome sync storage (no setup: uses the Google account signed in to Chrome) ----------------
+ * chrome.storage.sync allows ~100 KB in total and 8 KB per item, so each character is compressed and split in chunks. */
+
+const CHUNK = 7000;
+
+async function gzip (str) {
+	const cs = new CompressionStream("deflate-raw");
+	const buf = await new Response(new Blob([str]).stream().pipeThrough(cs)).arrayBuffer();
+	let bin = ""; const bytes = new Uint8Array(buf);
+	for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	return btoa(bin);
+}
+async function gunzip (b64) {
+	const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+	const ds = new DecompressionStream("deflate-raw");
+	return new Response(new Blob([bytes]).stream().pipeThrough(ds)).text();
+}
+
+async function syncList () {
+	const all = await chrome.storage.sync.get(null);
+	const chars = []; const tombs = [];
+	for (const [k, v] of Object.entries(all)) {
+		if (k.startsWith("m:")) chars.push({id: k.slice(2), ...v});
+		if (k.startsWith("t:")) tombs.push(k.slice(2));
+	}
+	return {chars, tombs, bytes: await chrome.storage.sync.getBytesInUse(null), quota: chrome.storage.sync.QUOTA_BYTES};
+}
+
+async function syncGet (id) {
+	const meta = (await chrome.storage.sync.get("m:" + id))["m:" + id];
+	if (!meta) return null;
+	const keys = Array.from({length: meta.n}, (_, i) => `c:${id}:${i}`);
+	const parts = await chrome.storage.sync.get(keys);
+	return JSON.parse(await gunzip(keys.map(k => parts[k] || "").join("")));
+}
+
+async function syncSave (char) {
+	const clean = {...char};
+	delete clean._driveId; delete clean._dirty; delete clean._driveModified; delete clean._syncDirty;
+	const data = await gzip(JSON.stringify(clean));
+	const n = Math.ceil(data.length / CHUNK);
+	const old = (await chrome.storage.sync.get("m:" + char.id))["m:" + char.id];
+	const items = {};
+	for (let i = 0; i < n; i++) items[`c:${char.id}:${i}`] = data.slice(i * CHUNK, (i + 1) * CHUNK);
+	items["m:" + char.id] = {n, u: char.updatedAt || Date.now(), name: char.name || ""};
+	try {
+		await chrome.storage.sync.set(items);
+	} catch (e) {
+		throw new Error(/QUOTA/i.test(e.message) ? "Chrome sync storage is full (about 100 KB): delete some characters, use smaller portraits or switch to Google Drive." : e.message);
+	}
+	if (old && old.n > n) await chrome.storage.sync.remove(Array.from({length: old.n - n}, (_, i) => `c:${char.id}:${n + i}`));
+	await chrome.storage.sync.remove("t:" + char.id);
+	return {bytes: data.length};
+}
+
+async function syncDelete (id) {
+	const meta = (await chrome.storage.sync.get("m:" + id))["m:" + id];
+	const keys = ["m:" + id, ...Array.from({length: meta?.n || 0}, (_, i) => `c:${id}:${i}`)];
+	await chrome.storage.sync.remove(keys);
+	await chrome.storage.sync.set({["t:" + id]: Date.now()});
+	return true;
+}
+
 /* ---------------- Messaggi ---------------- */
 
 const handlers = {
@@ -235,6 +298,10 @@ const handlers = {
 	"drive.get": ({fileId}) => driveGet(fileId),
 	"drive.save": ({char, fileId}) => driveSave(char, fileId),
 	"drive.delete": ({fileId}) => driveTrash(fileId),
+	"sync.list": () => syncList(),
+	"sync.get": ({id}) => syncGet(id),
+	"sync.save": ({char}) => syncSave(char),
+	"sync.delete": ({id}) => syncDelete(id),
 	"roll20.send": async ({payload}) => {
 		const tabs = await chrome.tabs.query({url: ["https://app.roll20.net/editor*", "https://roll20.net/editor*"]});
 		let sent = 0;
