@@ -1,0 +1,74 @@
+{
+  "manifest_version": 3,
+  "name": "5etools Characters",
+  "short_name": "5etools Characters",
+  "version": "2.1.0",
+  "description": "D&D Beyond-style character builder and sheets on 5e.tools, using the site's own data and look. Google sign-in, saved to Google Drive.",
+  "permissions": [
+    "identity",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://5e.tools/*",
+    "https://www.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "My Characters (5e.tools)",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://5e.tools/*"
+      ],
+      "js": [
+        "src/bridge.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://5e.tools/*"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle",
+      "js": [
+        "src/util.js",
+        "src/render.js",
+        "src/data.js",
+        "src/rules.js",
+        "src/store.js",
+        "src/styles.js",
+        "src/ui-core.js",
+        "src/ui-choices.js",
+        "src/ui-builder.js",
+        "src/ui-sheet.js",
+        "src/ui-app.js",
+        "src/main.js"
+      ]
+    }
+  ],
+  "oauth2": {
+    "client_id": "PASTE-YOUR-CLIENT-ID.apps.googleusercontent.com",
+    "scopes": [
+      "openid",
+      "email",
+      "profile",
+      "https://www.googleapis.com/auth/drive.file"
+    ]
+  }
+}
