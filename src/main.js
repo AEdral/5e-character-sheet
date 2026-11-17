@@ -13,7 +13,7 @@
 	while (!(globalThis.Renderer && globalThis.Parser) && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 150));
 	try {
 		const s = await CS.store.getSettings();
-		CS.data.settings = {edition: s.edition || "all", hoverDelay: s.hoverDelay !== false, roll20: s.roll20 !== false, adBlock: s.adBlock !== false, cloud: s.cloud || "chrome"};
+		CS.data.settings = {edition: s.edition || "all", hoverDelay: s.hoverDelay !== false, roll20: s.roll20 !== false, adBlock: s.adBlock !== false, cloud: s.cloud || "chrome", roll20Style: s.roll20Style || "5e"};
 		CS.render.hoverDelay = CS.data.settings.hoverDelay;
 	} catch (e) { /* defaults */ }
 	CS.applyAdCss();

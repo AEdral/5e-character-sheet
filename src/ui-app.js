@@ -54,6 +54,7 @@
 		const a = S.auth;
 		const list = h("div", {class: "cs5e-drawer__list"});
 		const fileIn = h("input", {type: "file", accept: ".json,application/json", class: "cs5e-hidden", on: {change: importFile}});
+		const pdfIn = h("input", {type: "file", accept: ".pdf,application/pdf", class: "cs5e-hidden", on: {change: importDdb}});
 		drawer.replaceChildren(
 			h("div", {class: "cs5e-drawer__head"},
 				h("h4", {class: "ve-m-0"}, "My Characters"),
@@ -61,7 +62,8 @@
 			h("div", {class: "cs5e-drawer__auth"}, ...cloudStatus(a)),
 			h("div", {class: "ve-flex-v-center cs5e-gap ve-mb-2"},
 				U.btn("+ Create a Character", newCharacter, "ve-btn-primary"),
-				U.btn("Import", () => fileIn.click(), "ve-btn-default"), fileIn),
+				U.btn("Import", () => fileIn.click(), "ve-btn-default", {title: "Import a character exported from this extension (.json)"}), fileIn,
+				U.btn("Import from D&D Beyond", () => pdfIn.click(), "ve-btn-default", {title: "Import a character sheet exported as PDF from D&D Beyond (Character Sheet \u2192 Export to PDF)"}), pdfIn),
 			list,
 			settingsBox(),
 		);
@@ -113,6 +115,7 @@
 			h("label", {class: "cs5e-field"}, h("span", null, "Rules"), U.sel([["all", "All (2014 + 2024)"], ["one", "2024 only"], ["classic", "2014 only"]], s.edition, v => app.setSetting("edition", v))),
 			h("label", {class: "ve-flex-v-center cs5e-gap-s ve-small"}, h("input", {type: "checkbox", checked: s.hoverDelay !== false, on: {change: e => app.setSetting("hoverDelay", e.target.checked)}}), "Delay hover popups (~1 second)"),
 			h("label", {class: "ve-flex-v-center cs5e-gap-s ve-small"}, h("input", {type: "checkbox", checked: s.roll20 !== false, on: {change: e => app.setSetting("roll20", e.target.checked)}}), "Send rolls to Roll20 when a Roll20 game tab is open"),
+			h("label", {class: "cs5e-field"}, h("span", null, "Roll20 chat style"), U.sel([["5e", "Rich cards (D&D 5E by Roll20 sheet)"], ["default", "Basic (any game)"]], s.roll20Style || "5e", v => app.setSetting("roll20Style", v))),
 			h("label", {class: "ve-flex-v-center cs5e-gap-s ve-small"}, h("input", {type: "checkbox", checked: s.adBlock !== false, on: {change: e => app.setSetting("adBlock", e.target.checked)}}), "Block ads on 5e.tools"),
 			h("hr"),
 			h("div", {class: "ve-small ve-muted"}, "Google sign-in in Edge/Brave/other Chromium browsers: create a “Web application” OAuth client with this redirect URI and paste its ID below."),
@@ -182,6 +185,28 @@
 			delete merged._driveId;
 			await S.save(merged);
 			renderDrawer();
+		} catch (err) { alert("Import failed: " + err.message); }
+	}
+
+	async function importDdb (e) {
+		const f = e.target.files?.[0];
+		e.target.value = "";
+		if (!f) return;
+		if (!await ensureData()) return;
+		try {
+			toast("Reading the D&D Beyond sheet\u2026");
+			const {char, report} = await CS.ddb.importPdf(f);
+			await S.save(char);
+			renderDrawer();
+			await openChar(char, "sheet");
+			const body = h("div", {class: "ve-flex-col cs5e-gap"},
+				h("p", {class: "ve-m-0"}, h("b", null, char.name), ` imported from D&D Beyond: species, background, classes, feats, invocations, spells and equipment were matched to 5etools data.`),
+				report.length
+					? h("div", null, h("div", {class: "ve-bold ve-mb-1"}, "Please check:"), h("ul", {class: "ve-m-0"}, report.map(r => h("li", null, r))))
+					: h("p", {class: "ve-m-0 ve-muted"}, "Everything was matched."),
+				h("p", {class: "ve-m-0 ve-small ve-muted"}, "Ability scores, HP and proficiencies are set to the values of the D&D Beyond sheet. Open the builder (Edit) to review any choice."));
+			const m = U.modal("Import from D&D Beyond", {wide: false});
+			m.inner.append(body, h("div", {class: "ve-flex-h-right ve-mt-2"}, U.btn("OK", () => m.close(), "ve-btn-primary")));
 		} catch (err) { alert("Import failed: " + err.message); }
 	}
 

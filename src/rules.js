@@ -757,7 +757,11 @@
 
 		// saves
 		for (const [a, v] of Object.entries(char.saveExtra || {})) if (v) g.saves[a] = g.saves[a] || "Custom";
-		const saves = Object.fromEntries(CS.ABIL.map(a => [a, {prof: !!g.saves[a], from: g.saves[a] || null, value: scores[a].mod + (g.saves[a] ? pb : 0)}]));
+		// magic items: bonuses to saving throws, spell attacks and spell save DCs (worn, attuned when required)
+		const activeItems = (char.inventory || []).filter(i => i.equipped !== false && (!i.snap?.reqAttune || i.attuned) && (i.equipped || i.attuned));
+		const itemBonus = key => activeItems.reduce((n, i) => n + numBonus(i.snap?.[key]), 0);
+		const saveItem = itemBonus("bonusSavingThrow");
+		const saves = Object.fromEntries(CS.ABIL.map(a => [a, {prof: !!g.saves[a], from: g.saves[a] || null, value: scores[a].mod + (g.saves[a] ? pb : 0) + saveItem}]));
 
 		// skills
 		const skills = CS.SKILLS.map(s => {
@@ -801,6 +805,8 @@
 
 		const size = char.choices?.["race:size"] || er?.size?.[0] || "M";
 		const spells = spellcasting(char, scores, pb, ces);
+		const spAtkItem = itemBonus("bonusSpellAttack"); const spDcItem = itemBonus("bonusSpellSaveDc");
+		for (const pc of spells.perClass) { pc.attack += spAtkItem; pc.dc += spDcItem; }
 		const weight = (char.inventory || []).reduce((s, i) => s + (Number(i.snap?.weight) || 0) * (Number(i.qty) || 1), 0);
 		const settings = char.settings || {};
 

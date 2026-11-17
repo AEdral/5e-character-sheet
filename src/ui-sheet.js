@@ -173,7 +173,11 @@
 				const hit = (sp.spellAttack || []).length ? CS.fmtMod(pc?.attack ?? 0) : saveAb ? `${saveAb.slice(0, 3).toUpperCase()} ${pc?.dc ?? ""}` : "";
 				const spec = CS.spellRollSpec(sp, pc, k);
 				const dmg = spec ? CS.damageText(spec) : "";
-				return h("tr", spec ? CS.rollable(en => CS.spellRollSpec(sp, pc, k, en), CS.conditionalRiders(k, "spell", sp)) : null,
+				const card = () => CS.roll(CS.spellCardSpec(sp, pc));
+				const rowAttrs = spec
+					? CS.rollable(en => CS.spellRollSpec(sp, pc, k, en), CS.conditionalRiders(k, "spell", sp), undefined, [{label: "Post Spell Card to Roll20", run: card}])
+					: {class: "cs5e-roll", title: "Click to post the spell card to the Roll20 chat", on: {click: e => { if (!e.target.closest("a")) card(); }}};
+				return h("tr", rowAttrs,
 					h("td", null, U.link("spell", sp), h("div", {class: "ve-muted ve-small"}, [x.from, x.tag, l > 0 && isPact && !/Arcanum/.test(x.tag || "") ? "Pact slot" : null].filter(Boolean).join(" \u00b7 "))),
 					h("td", {class: "ve-small"}, U.spTime(sp)), h("td", {class: "ve-small"}, U.spRange(sp)),
 					h("td", {class: "ve-bold ve-small"}, hit), h("td", {class: "ve-small"}, dmg),
@@ -239,19 +243,113 @@
 
 	/* ---------------- print ---------------- */
 
+	/* ---------------- print / PDF: a self-contained, light, A4 document (no site styles, no dark theme) ---------------- */
+
+	const PRINT_CSS = `
+@page{size:A4;margin:11mm 10mm}
+*{box-sizing:border-box}
+html,body{background:#fff!important;color:#111!important;margin:0}
+body{font:9.5pt/1.35 "Helvetica Neue",Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+a{color:#111!important;text-decoration:none!important}
+h1{font:bold 20pt Georgia,serif;color:#7a1f0a;margin:0}
+h2{font:bold 11pt Georgia,serif;font-variant:small-caps;color:#7a1f0a;border-bottom:1.5px solid #c9861a;margin:12px 0 5px;padding-bottom:1px;break-after:avoid}
+h3{font-size:10pt;margin:8px 0 2px;break-after:avoid}
+small,.m{color:#555}
+.head{display:flex;gap:12px;align-items:center;border-bottom:2px solid #c9861a;padding-bottom:6px;margin-bottom:8px}
+.head img{width:62px;height:62px;object-fit:cover;border-radius:5px;border:1.5px solid #c9861a}
+.boxes{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-bottom:6px}
+.box{border:1.2px solid #c9861a;border-radius:5px;text-align:center;padding:3px 2px}
+.box b{display:block;font-size:13pt}
+.box span{font-size:6.8pt;text-transform:uppercase;color:#444;letter-spacing:.03em}
+.abil{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:6px}
+.abil .box b{font-size:15pt}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+table{width:100%;border-collapse:collapse;margin:2px 0 4px}
+th{text-align:left;font-size:7.5pt;text-transform:uppercase;color:#444;border-bottom:1px solid #999;padding:2px 3px}
+td{border-bottom:.5px solid #ddd;padding:2px 3px;vertical-align:top}
+tr{break-inside:avoid}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;border:1px solid #333;margin-right:3px}
+.dot.on{background:#333}.dot.ex{background:#7a1f0a;border-color:#7a1f0a}
+.slots span{display:inline-block;width:9px;height:9px;border:1px solid #333;margin-right:2px;vertical-align:middle}
+.blk{break-inside:avoid;margin-bottom:6px}
+.txt p{margin:2px 0}.txt ul{margin:2px 0 2px 16px;padding:0}
+.txt table td,.txt table th{font-size:8.5pt}
+[class*="ve-rd__h"]{font-weight:bold}
+.ve-rd__list{margin:2px 0 2px 16px;padding:0}
+.spell-meta{font-size:8.5pt;color:#333;margin-bottom:2px}
+.notes{white-space:pre-wrap}
+`;
+
+	function printDoc (c, k) {
+		const e = CS.esc;
+		const cls = k.classes.map(ce => `${ce.cls.name}${ce.sc ? ` (${ce.sc.shortName || ce.sc.name})` : ""} ${ce.level}`).join(" / ");
+		const box = (v, l) => `<div class="box"><b>${e(v)}</b><span>${e(l)}</span></div>`;
+		const sc = k.spellcasting;
+		const pr = k.proficiencies;
+		const attacks = k.attacks.map(a => { const spec = CS.weaponRollSpec(a, k); return `<tr><td><b>${e(a.name)}</b><br><small>${e([...a.props, ...a.mastery.map(m => "Mastery: " + m)].join(", "))}</small></td><td>${e(a.range)}</td><td>${e(CS.fmtMod(spec.rolls[0].d20))}</td><td>${e(CS.damageText(spec))}</td></tr>`; }).join("");
+		// spells
+		const list = [];
+		for (const s of c.spells) { const sp = D.getSpell(s); if (sp) list.push({sp, from: s.cls, tag: sp.level ? (s.prepared ? "prepared" : "not prepared") : ""}); }
+		for (const g of k.grants.spells) { const sp = D.findByUid(D.spells, g.uid); if (sp) list.push({sp, from: g.from, tag: g.how + (g.uses ? `, ${g.uses}` : "")}); }
+		list.sort((a, b) => a.sp.level - b.sp.level || a.sp.name.localeCompare(b.sp.name));
+		const spellRows = list.map(x => {
+			const pc = sc.perClass.find(p => p.cls === x.from) || sc.perClass[0];
+			const save = (x.sp.savingThrow || [])[0];
+			const hit = (x.sp.spellAttack || []).length ? CS.fmtMod(pc?.attack ?? 0) : save ? `${save.slice(0, 3).toUpperCase()} ${pc?.dc ?? ""}` : "";
+			const spec = CS.spellRollSpec(x.sp, pc, k);
+			return `<tr><td>${x.sp.level === 0 ? "C" : x.sp.level}</td><td><b>${e(x.sp.name)}</b><br><small>${e([x.from, x.tag].filter(Boolean).join(" · "))}</small></td><td>${e(U.spTime(x.sp))}</td><td>${e(U.spRange(x.sp))}</td><td>${e(hit)}</td><td>${e(spec ? CS.damageText(spec) : "")}</td><td>${[U.isConc(x.sp) ? "C" : "", x.sp.meta?.ritual ? "R" : ""].filter(Boolean).join(" ")}</td></tr>`;
+		}).join("");
+		const slotBoxes = n => `<span class="slots">${"<span></span>".repeat(n)}</span>`;
+		const slotsHtml = [
+			sc.slots.length ? `<div><b>Spell slots</b> (long rest): ${sc.slots.map((n, i) => n ? `${CS.ordinal(i + 1)} ${slotBoxes(n)}` : "").filter(Boolean).join(" &nbsp; ")}</div>` : "",
+			sc.pact ? `<div><b>Pact Magic</b> (short rest): ${sc.pact.count} × ${CS.ordinal(sc.pact.level)} level ${slotBoxes(sc.pact.count)}</div>` : "",
+		].join("");
+		const features = k.features.map(f => `<div class="blk"><h3>${e(f.name)} <small>${e(f.sub || f.cls)} ${f.level}</small></h3><div class="txt">${CS.rd.entries(f.entries)}</div></div>`).join("");
+		const traits = (k.race?.entries || []).filter(x => x?.name).map(t => `<div class="blk"><h3>${e(t.name)}</h3><div class="txt">${CS.rd.entries(t.entries || [])}</div></div>`).join("");
+		const feats = k.feats.map(f => `<div class="blk"><h3>${e(f.feat.name)}${f.note ? ` (${e(CS.cap(f.note))})` : ""} <small>${e(f.from)}</small></h3><div class="txt">${CS.rd.entries(f.feat.entries)}</div></div>`).join("")
+			+ k.optfeatures.map(o => `<div class="blk"><h3>${e(o.of.name)} <small>${e(o.group)}</small></h3><div class="txt">${CS.rd.entries(o.of.entries)}</div></div>`).join("");
+		const spellText = [...new Map(list.map(x => [x.sp.name + x.sp.source, x.sp])).values()].map(sp => `<div class="blk"><h3>${e(sp.name)}</h3><div class="spell-meta">${e(U.spLevel(sp))} ${e(CS.SCHOOL[sp.school] || "")} · ${e(U.spTime(sp))} · ${e(U.spRange(sp))} · ${e([sp.components?.v && "V", sp.components?.s && "S", sp.components?.m && "M"].filter(Boolean).join(", "))} · ${U.isConc(sp) ? "Concentration" : ""}</div><div class="txt">${CS.rd.entries(sp.entries)}${CS.rd.entries(sp.entriesHigherLevel)}</div></div>`).join("");
+		const inv = c.inventory.map(i => `${i.equipped ? "<b>" : ""}${e(i.displayName || i.name)}${i.qty > 1 ? ` ×${i.qty}` : ""}${i.equipped ? "</b>" : ""}`).join(", ");
+		const cur = c.currency;
+		const notes = [["Personality Traits", c.notes.traits], ["Ideals", c.notes.ideals], ["Bonds", c.notes.bonds], ["Flaws", c.notes.flaws], ["Backstory", c.notes.backstory], ["Allies & Organizations", c.notes.allies], ["Other Notes", c.notes.other]].filter(x => x[1]);
+		const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${e(c.name || "Character")}</title><style>${PRINT_CSS}</style></head><body>
+<div class="head">${c.portrait ? `<img src="${e(c.portrait)}">` : ""}<div><h1>${e(c.name || "Unnamed")}</h1>
+<div>${e([k.race?.displayName, cls].filter(Boolean).join(" · "))} · Level ${k.level}</div>
+<div class="m">${e([k.background?.name, c.alignment, c.player ? "Player: " + c.player : "", c.xp ? `XP ${c.xp}` : ""].filter(Boolean).join(" · "))}</div></div></div>
+<div class="boxes">${box(k.ac.value, "Armor Class")}${box(k.hp.max, "Hit Points")}${box(Object.entries(k.hitDice).map(([f, n]) => `${n}d${f}`).join("+") || "—", "Hit Dice")}${box(CS.fmtMod(k.initiative), "Initiative")}${box(`${k.speed.walk} ft.`, "Speed")}${box(CS.fmtMod(k.pb), "Proficiency")}${box(k.passive.perception, "Passive Perc.")}${box(CS.SIZE[k.size] || k.size, "Size")}</div>
+<div class="abil">${CS.ABIL.map(a => `<div class="box"><span>${CS.ABIL_FULL[a]}</span><b>${CS.fmtMod(k.scores[a].mod)}</b><span>${k.scores[a].total} · save ${k.saves[a].prof ? "●" : "○"} ${CS.fmtMod(k.saves[a].value)}</span></div>`).join("")}</div>
+<div class="cols"><div>
+<h2>Skills</h2><table>${k.skills.map(s => `<tr><td><span class="dot ${s.prof >= 2 ? "ex" : s.prof ? "on" : ""}"></span>${e(s.name)} <small>${CS.ABIL_SHORT[s.abil]}</small></td><td style="text-align:right"><b>${CS.fmtMod(s.value)}</b></td></tr>`).join("")}</table>
+<h2>Proficiencies & Senses</h2>
+<div><b>Armor:</b> ${e(pr.armor.join(", ") || "—")}</div><div><b>Weapons:</b> ${e(pr.weapons.join(", ") || "—")}</div>
+<div><b>Tools:</b> ${e([...pr.tools, c.profsExtra].filter(Boolean).join(", ") || "—")}</div><div><b>Languages:</b> ${e([...pr.languages, c.languagesExtra].filter(Boolean).join(", ") || "—")}</div>
+<div><b>Senses:</b> Passive Perception ${k.passive.perception}, Investigation ${k.passive.investigation}, Insight ${k.passive.insight}${k.darkvision ? `, Darkvision ${k.darkvision} ft.` : ""}</div>
+${k.resist.length ? `<div><b>Resistances:</b> ${e(k.resist.join(", "))}</div>` : ""}
+</div><div>
+<h2>Attacks</h2>${attacks ? `<table><tr><th>Attack</th><th>Range</th><th>Hit</th><th>Damage</th></tr>${attacks}</table>` : `<div class="m">No weapons equipped.</div>`}
+${sc.perClass.length || list.length ? `<h2>Spellcasting</h2>${sc.perClass.map(p => `<div><b>${e(p.cls)} ${p.level}</b>: ${CS.ABIL_FULL[p.abil]} · save DC ${p.dc} · attack ${CS.fmtMod(p.attack)}</div>`).join("")}${slotsHtml}` : ""}
+<h2>Equipment</h2><div>${inv || "—"}</div>
+<div class="m">PP ${cur.pp || 0} · GP ${cur.gp || 0} · EP ${cur.ep || 0} · SP ${cur.sp || 0} · CP ${cur.cp || 0} · Weight ${k.weight.toFixed(1)}/${k.carry} lb.</div>
+</div></div>
+${spellRows ? `<h2>Spells</h2><table><tr><th>Lvl</th><th>Spell</th><th>Time</th><th>Range</th><th>Hit/DC</th><th>Damage</th><th></th></tr>${spellRows}</table>` : ""}
+${notes.length ? `<h2>Personality & Notes</h2>${notes.map(([l, v]) => `<div class="blk"><b>${e(l)}:</b> <span class="notes">${e(v)}</span></div>`).join("")}` : ""}
+${features ? `<h2>Class Features</h2>${features}` : ""}
+${traits ? `<h2>Species Traits — ${e(k.race.displayName)}</h2>${traits}` : ""}
+${feats ? `<h2>Feats & Options</h2>${feats}` : ""}
+${spellText ? `<h2>Spell Descriptions</h2>${spellText}` : ""}
+</body></html>`;
+		// strip the site's hover handlers from the rendered text
+		return html.replace(/\son(mouseover|mouseleave|mousemove|click|dragstart)="[^"]*"/g, "");
+	}
+
 	S.print = () => {
-		const c = app.st.char;
+		const c = app.st.char; const k = app.st.calc;
 		const w = window.open("", "_blank");
 		if (!w) { alert("Popup blocked: allow popups for 5e.tools to print."); return; }
-		const links = [...document.querySelectorAll('link[rel="stylesheet"]')].map(l => `<link rel="stylesheet" href="${l.href}">`).join("");
-		const sheet = S.render();
-		sheet.querySelectorAll("button, .cs5e-tabs").forEach(b => b.remove());
-		const k = app.st.calc;
-		const featDetails = k.features.map(f => `<div class="cs5e-pf"><h3>${CS.esc(f.name)} <small>(${CS.esc(f.sub || f.cls)} ${f.level})</small></h3>${CS.rd.entries(f.entries)}</div>`).join("");
-		const spellDetails = [...c.spells.map(s => D.getSpell(s)), ...k.grants.spells.map(g => D.findByUid(D.spells, g.uid))].filter(Boolean).map(sp => `<div class="cs5e-pf">${CS.rd.compact("spell", sp)}</div>`).join("");
-		w.document.write(`<!DOCTYPE html><html class="${document.documentElement.className.replace(/ve-night-mode\S*/g, "")}"><head><meta charset="utf-8"><title>${CS.esc(c.name || "Character")}</title>${links}<style>${CS.APP_CSS}
-			body{padding:10mm!important;background:#fff} .cs5e-pf{break-inside:avoid;margin-bottom:8px} .cs5e-acc__body{display:none} @page{margin:8mm}</style></head>
-			<body>${sheet.outerHTML}<h2>Features</h2>${featDetails}<h2>Spells</h2>${spellDetails}<script>setTimeout(()=>print(),800)<\/script></body></html>`);
+		w.document.open();
+		w.document.write(printDoc(c, k));
 		w.document.close();
+		const go = () => { w.focus(); w.print(); };
+		if (w.document.readyState === "complete") setTimeout(go, 400); else w.addEventListener("load", () => setTimeout(go, 400));
 	};
 })();
