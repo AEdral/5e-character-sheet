@@ -152,6 +152,7 @@ body.cs5e-noscroll{overflow:hidden!important}
 .cs5e-roll:hover{background:rgba(0,107,196,.08)}
 tr.cs5e-roll:hover>td{background:rgba(0,107,196,.06)}
 
+.cs5e-dd{position:relative;display:inline-block}.cs5e-dd>summary{list-style:none;user-select:none}.cs5e-dd>summary::-webkit-details-marker{display:none}.cs5e-dd__menu{position:absolute;right:0;top:calc(100% + 2px);z-index:50;width:230px;background:var(--rgb-bg);color:var(--rgb-font);border:1px solid rgba(127,127,127,.5);border-top:3px solid var(--rgb-border--statblock);box-shadow:0 4px 16px rgba(0,0,0,.35);padding:4px 0;font-size:13px;white-space:normal}
 .cs5e-menu{position:fixed;z-index:1200;min-width:220px;background:var(--rgb-bg);color:var(--rgb-font);border:1px solid rgba(127,127,127,.5);border-top:3px solid var(--rgb-border--statblock);box-shadow:0 4px 16px rgba(0,0,0,.35);padding:4px 0;font-size:13px}
 .cs5e-menu__i{display:block;width:100%;text-align:left;background:none;border:0;padding:5px 12px;color:inherit;cursor:pointer}
 .cs5e-menu__i:hover{background:rgba(0,107,196,.12)}

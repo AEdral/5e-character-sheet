@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "5etools Characters",
   "short_name": "5etools Characters",
-  "version": "2.6.0",
+  "version": "2.10.0",
   "description": "D&D Beyond-style character builder and sheets on 5e.tools, using the site's own data and look. Google sign-in, saved to Google Drive.",
   "permissions": [
     "identity",

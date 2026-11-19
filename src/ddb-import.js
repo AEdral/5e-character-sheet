@@ -285,7 +285,7 @@
 		return CS.ABIL.find(a => n.startsWith(CS.ABIL_FULL[a].toLowerCase()) || n === a);
 	}
 
-	X.toChar = (P, {report = []} = {}) => {
+	X.toChar = (P, {report = [], asiByCharLevel = false} = {}) => {
 		const R = CS.rules;
 		const c = R.newChar();
 		c.name = P.name || "Imported character";
@@ -297,6 +297,7 @@
 		c.currency = P.currency;
 		c.settings.abilityMethod = "manual";
 		c.settings.hpMethod = "fixed";
+		c.settings.asiByCharLevel = !!asiByCharLevel;
 		c.importedFrom = "D&D Beyond";
 
 		const sectionFor = re => P.sections.find(s => re.test(s.title));
@@ -368,6 +369,12 @@
 		for (const m of asiTxt.matchAll(/(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+score\s+increases\s+by\s+(\d)/gi)) raceIncreases[abilityOf(m[1])] = Number(m[2]);
 		let addedExtra = false;
 		const tried = new Set();
+		// how many ASIs the rules give (by class levels): the house rule's extra slots stay open for the user
+		const rawAsiCount = c.settings.asiByCharLevel
+			? R.compute({...c, settings: {...c.settings, asiByCharLevel: false}, choices: {}}).choices.filter(ch => ch.kind === "asi").length
+			: Infinity;
+		const openSlots = new Set();
+		const clAsiIndex = id => [4, 8, 12, 16, 19].indexOf(Number(id.split("@")[1]));
 		for (let iter = 0; iter < 25; iter++) {
 			const k = R.compute(c);
 			const takenFeats = new Set(k.feats.map(f => K(f.feat.name, f.feat.source)));
@@ -383,6 +390,7 @@
 					case "asi": {
 						const f = featFor(ch.edition === "one" ? ["G"] : null, takenFeats);
 						if (f) { set(ch.id, {mode: "feat"}); set(ch.id + ">feat", {name: f.feat.name, source: f.feat.source}); f.used = true; takenFeats.add(K(f.feat.name, f.feat.source)); }
+						else if (/^cl:asi@/.test(ch.id) && clAsiIndex(ch.id) >= rawAsiCount) openSlots.add(ch.id); /* extra slot of the house rule: D&D Beyond has nothing for it, the user chooses */
 						else { set(ch.id, {mode: "asi"}); }
 						break;
 					}
@@ -392,6 +400,7 @@
 						break;
 					}
 					case "ability": {
+						if (openSlots.has(ch.parent) || [...openSlots].some(o => ch.id.startsWith(o + ">"))) break;
 						// feats: the option DDB lists under the feat ("| Charisma"); species: "Your X score increases by N";
 						// otherwise the highest (odd first) final scores
 						const fi = featTextFor(ch);
@@ -522,6 +531,9 @@
 			}
 		}
 		for (const [k2, v] of Object.entries(c.choices)) if (v === undefined) delete c.choices[k2];
+		if (openSlots.size) report.push(`New with the character-level house rule (D&D Beyond gives ASIs only at class levels): choose a feat or +2 ability scores at character level ${[...openSlots].map(id => id.split("@")[1]).join(", ")} in the builder.`);
+		const live = new Set(R.compute(c).choices.map(ch => ch.id));
+		for (const k2 of Object.keys(c.choices)) if (!live.has(k2)) delete c.choices[k2];
 		c._usedSpells = usedSpells;
 	}
 
@@ -608,8 +620,13 @@
 		const F = await X.readFields(await file.arrayBuffer());
 		if (!F.CharacterName && !F["CLASS LEVEL"]) throw new Error("No D&D Beyond character fields found in this PDF.");
 		const P = X.parseSheet(F);
+		// multiclass: Ability Score Improvements by total character level (the builder's house rule)
+		const multi = P.classes.length > 1;
 		const report = [];
-		const char = X.toChar(P, {report});
+		const char = X.toChar(P, {report, asiByCharLevel: multi});
+		if (multi) report.unshift(char.settings.asiByCharLevel
+			? "Ability Score Improvements are given at character levels 4, 8, 12, 16 and 19 (house rule, can be changed in the builder's Home step)."
+			: "Ability Score Improvements are given at class levels, as in the rules (the character-level house rule can be turned on in the builder's Home step).");
 		return {char, report, parsed: P};
 	};
 })();
