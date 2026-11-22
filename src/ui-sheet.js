@@ -44,7 +44,7 @@
 				h("div", {class: "ve-muted ve-small"}, `Level ${k.level}${k.background ? " · " + k.background.name : ""}${c.alignment ? " · " + c.alignment : ""}`)),
 			h("div", {class: "ve-flex-v-center cs5e-gap"},
 				U.btn("Short Rest", () => shortRest(), "ve-btn-default ve-btn-xs"),
-				U.btn("Long Rest", () => { if (confirm("Take a long rest? HP, spell slots and hit dice will be restored.")) commit(x => { x.hp.current = k.hp.max; x.hp.temp = 0; x.tracking.slotsUsed = {}; x.tracking.hitDiceUsed = Math.max(0, (x.tracking.hitDiceUsed || 0) - Math.max(1, Math.floor(k.level / 2))); x.tracking.deathSuccess = 0; x.tracking.deathFail = 0; }); }, "ve-btn-default ve-btn-xs"),
+				U.btn("Long Rest", () => { if (confirm("Take a long rest? HP, spell slots and hit dice will be restored.")) commit(x => { x.hp.current = k.hp.max; x.hp.temp = 0; x.tracking.slotsUsed = {}; x.tracking.hitDiceUsed = Math.max(0, (x.tracking.hitDiceUsed || 0) - Math.max(1, Math.floor(k.level / 2))); x.tracking.deathSuccess = 0; x.tracking.deathFail = 0; CS.actions.rest(x, k, "long"); }); }, "ve-btn-default ve-btn-xs"),
 				U.btn("Print / PDF", () => S.print(), "ve-btn-default ve-btn-xs"),
 				U.btn("Edit Character", () => app.openBuilder(), "ve-btn-primary ve-btn-xs")));
 
@@ -55,7 +55,7 @@
 
 		const top = h("div", {class: "cs5e-sheet__top"}, abil,
 			h("div", {class: "cs5e-stat"}, h("div", {class: "cs5e-stat__l"}, "Proficiency"), h("div", {class: "cs5e-stat__v"}, CS.fmtMod(k.pb)), h("div", {class: "cs5e-stat__l"}, "Bonus")),
-			h("div", {class: "cs5e-stat"}, h("div", {class: "cs5e-stat__l"}, "Walking"), h("div", {class: "cs5e-stat__v"}, `${k.speed.walk} ft.`), h("div", {class: "cs5e-stat__l"}, "Speed")),
+			h("div", {class: "cs5e-stat", title: (k.speedParts || []).join(", ")}, h("div", {class: "cs5e-stat__l"}, "Walking"), h("div", {class: "cs5e-stat__v"}, `${k.speed.walk} ft.`), h("div", {class: "cs5e-stat__l"}, "Speed")),
 			h("div", {class: "cs5e-stat cs5e-stat--click", on: {click: () => commit(x => { x.tracking.inspiration = !x.tracking.inspiration; })}}, h("div", {class: "cs5e-stat__l"}, "Heroic"), h("div", {class: "cs5e-stat__v"}, t.inspiration ? "★" : "☆"), h("div", {class: "cs5e-stat__l"}, "Inspiration")),
 			h("div", {class: "cs5e-hp"},
 				h("div", {class: "cs5e-hp__ctl"}, U.btn("Heal", () => applyHp(1), "ve-btn-success ve-btn-xs"), hpInput, U.btn("Damage", () => applyHp(-1), "ve-btn-danger ve-btn-xs")),
@@ -83,7 +83,7 @@
 			h("td", {class: "ve-bold ve-text-right"}, CS.fmtMod(s.value)))))));
 
 		const combat = h("div", {class: "cs5e-sheet__combat"},
-			h("div", {...CS.rollable(() => ({title: "Initiative", rolls: [{label: "Initiative", d20: k.initiative}]})), class: "cs5e-stat cs5e-roll"}, h("div", {class: "cs5e-stat__l"}, "Initiative"), h("div", {class: "cs5e-stat__v"}, CS.fmtMod(k.initiative))),
+			h("div", {...CS.rollable(() => ({title: "Initiative", rolls: [{label: "Initiative", d20: k.initiative}]})), class: "cs5e-stat cs5e-roll", title: ["DEX " + CS.fmtMod(k.scores.dex.mod), ...(k.initParts || [])].join(" + ")}, h("div", {class: "cs5e-stat__l"}, "Initiative"), h("div", {class: "cs5e-stat__v"}, CS.fmtMod(k.initiative))),
 			h("div", {class: "cs5e-stat cs5e-stat--shield", title: k.ac.parts.join(" + ")}, h("div", {class: "cs5e-stat__l"}, "Armor"), h("div", {class: "cs5e-stat__v"}, k.ac.value), h("div", {class: "cs5e-stat__l"}, "Class")),
 			h("div", {class: "cs5e-stat"}, h("div", {class: "cs5e-stat__l"}, "Hit Dice"), h("div", {class: "cs5e-stat__v cs5e-small-v"}, Object.entries(k.hitDice).map(([f, n]) => `${n}d${f}`).join(" + ") || "—"), h("div", {class: "cs5e-stat__l"}, `used ${t.hitDiceUsed || 0}`)),
 			h("div", {class: "cs5e-stat"}, h("div", {...CS.rollable(() => ({title: "Death Saving Throw", rolls: [{label: "Death Save", d20: 0}]})), class: "cs5e-stat__l cs5e-roll"}, "Death Saves \u{1F3B2}"),
@@ -106,18 +106,47 @@
 	function shortRest () {
 		const k = app.st.calc;
 		const left = k.level - (app.st.char.tracking.hitDiceUsed || 0);
-		const n = Number(prompt(`Short rest: how many Hit Dice do you spend? (${left} available)`, "0"));
-		if (!n || n < 0) return;
+		const ans = prompt(`Short rest: how many Hit Dice do you spend? (${left} available)\nFeatures that recharge on a short rest are restored.`, "0");
+		if (ans == null) return;
+		const n = Math.max(0, Number(ans) || 0);
 		const faces = Number(Object.keys(k.hitDice)[0] || 8);
 		let total = 0;
 		for (let i = 0; i < Math.min(n, left); i++) total += Math.max(1, 1 + Math.floor(Math.random() * faces) + k.scores.con.mod);
-		commit(x => { x.tracking.hitDiceUsed = (x.tracking.hitDiceUsed || 0) + Math.min(n, left); x.hp.current = Math.min(k.hp.max, (x.hp.current ?? k.hp.max) + total); if (k.spellcasting.pact) x.tracking.slotsUsed.pact = 0; });
-		alert(`You regain ${total} hit points (rolled d${faces} + CON each).`);
+		commit(x => { x.tracking.hitDiceUsed = (x.tracking.hitDiceUsed || 0) + Math.min(n, left); x.hp.current = Math.min(k.hp.max, (x.hp.current ?? k.hp.max) + total); if (k.spellcasting.pact) x.tracking.slotsUsed.pact = 0; CS.actions.rest(x, k, "short"); });
+		if (n) alert(`You regain ${total} hit points (rolled d${faces} + CON each).`);
 	}
 
 	/* ---------------- tabs ---------------- */
 
+	const RESET = {short: "Short Rest", short1: "Short Rest (1) · Long Rest", long: "Long Rest"};
+	const KINDS = [["all", "All"], ["action", "Action"], ["bonus", "Bonus Action"], ["reaction", "Reaction"], ["other", "Other"], ["limited", "Limited Use"]];
+
+	/** checkboxes (or a number for big pools like Lay on Hands) for the expended uses of a feature */
+	function usesTracker (a, c) {
+		const used = Number(c.tracking.uses?.[a.id] || 0);
+		const setUsed = v => commit(x => { x.tracking.uses = x.tracking.uses || {}; x.tracking.uses[a.id] = Math.max(0, Math.min(a.uses.max, v)); });
+		const stop = {click: e => e.stopPropagation()};
+		const box = a.uses.pool
+			? h("span", {class: "cs5e-uses__pool", on: stop}, h("input", {type: "number", class: "ve-form-control ve-input-xs cs5e-uses__n", min: 0, max: a.uses.max, value: a.uses.max - used, title: "Remaining", on: {change: e => setUsed(a.uses.max - Number(e.target.value || 0)), click: e => e.stopPropagation()}}), ` / ${a.uses.max}`)
+			: h("span", {class: "cs5e-uses__boxes"}, Array.from({length: a.uses.max}, (_, j) => h("input", {type: "checkbox", title: "Expended", checked: used > j, on: {change: e => setUsed(used + (e.target.checked ? 1 : -1)), click: e => e.stopPropagation()}})));
+		return h("span", {class: "cs5e-uses"}, box, h("span", {class: "cs5e-uses__r"}, RESET[a.uses.reset] || ""));
+	}
+
+	function actionRow (a, c, all) {
+		const pool = a.pool ? all.find(o => o.id === a.pool) : null;
+		const name = a.tag ? U.str(a.tag) : h("span", {class: "ve-bold"}, a.name);
+		const note = [a.cost, pool ? `uses ${pool.name}` : null, a.parentName && !a.tag ? a.parentName : null].filter(Boolean).join(" · ");
+		return U.details(`act:${a.id}`, h("span", {class: "cs5e-act"},
+			h("span", {class: "cs5e-act__n"}, name, h("span", {class: "ve-muted ve-small"}, ` ${a.origin}`), note ? h("div", {class: "ve-muted ve-small"}, note) : null),
+			a.uses ? usesTracker(a, c) : pool?.uses ? usesTracker(pool, c) : null),
+		() => U.rd(a.entries));
+	}
+
 	function actions (c, k) {
+		const all = CS.actions.list(c, k);
+		const f = app.st.actFilter || "all";
+		const show = kind => f === "all" || f === kind;
+		const pills = h("div", {class: "cs5e-actf"}, KINDS.map(([id, l]) => h("button", {type: "button", class: `cs5e-actf__p ${f === id ? "cs5e-actf__p--on" : ""}`, on: {click: () => { app.st.actFilter = id; app.rerender(); }}}, l)));
 		const rows = k.attacks.map(a => {
 			const spec = CS.weaponRollSpec(a, k);
 			return h("tr", CS.rollable(en => CS.weaponRollSpec(a, k, en), CS.conditionalRiders(k, "weapon", a)),
@@ -126,16 +155,28 @@
 				h("td", null, CS.damageText(spec), a.versatile ? h("div", {class: "ve-muted ve-small"}, `Two-handed: ${a.versatile} ${a.dmgType}`) : null));
 		});
 		const unarmed = h("tr", CS.rollable(() => ({title: "Unarmed Strike", rolls: [{label: "To Hit", d20: k.pb + k.scores.str.mod}, {label: "Damage (bludgeoning)", formula: String(Math.max(1, 1 + k.scores.str.mod))}]})), h("td", null, U.str("{@action Unarmed Strike|XPHB}")), h("td", null, "5 ft."), h("td", {class: "ve-bold"}, CS.fmtMod(k.pb + k.scores.str.mod)), h("td", null, `${Math.max(1, 1 + k.scores.str.mod)} `, h("span", {class: "ve-muted"}, "bludgeoning")));
-		const spellAtk = k.spellcasting.perClass.length ? h("div", {class: "ve-mt-2"}, h("div", {class: "cs5e-sub"}, "Spellcasting"),
-			...k.spellcasting.perClass.map(p => h("div", {class: "ve-small"}, h("b", null, p.cls), `: spell attack ${CS.fmtMod(p.attack)}, save DC ${p.dc} (${CS.ABIL_FULL[p.abil]})`))) : null;
+		const spellAtk = k.spellcasting.perClass.length ? h("div", {class: "ve-small ve-mt-1"}, ...k.spellcasting.perClass.map(p => h("div", null, h("b", null, p.cls), `: spell attack ${CS.fmtMod(p.attack)}, save DC ${p.dc} (${CS.ABIL_FULL[p.abil]})`))) : null;
 		const cantrips = c.spells.filter(s => s.level === 0).map(s => D.getSpell(s)).filter(Boolean);
-		return h("div", null,
-			h("div", {class: "cs5e-sub"}, "Attacks"),
+		const group = (kind, title, extra = []) => {
+			const items = all.filter(a => (kind === "limited" ? (a.uses || a.pool) : a.kind === kind));
+			if (!items.length && !extra.filter(Boolean).length) return null;
+			return h("div", {class: "ve-mt-2"}, h("div", {class: "cs5e-sub"}, title), ...extra, items.map(a => actionRow(a, c, all)));
+		};
+		const out = h("div", null, pills);
+		if (f === "limited") { out.append(group("limited", "Limited Use") || h("div", {class: "ve-muted ve-mt-2"}, "No limited-use features.")); return out; }
+		if (show("action")) out.append(group("action", "Actions", [
+			h("div", {class: "cs5e-sub2"}, "Attacks"),
 			h("table", {class: "ve-w-100 cs5e-tbl"}, h("thead", null, h("tr", null, ["Attack", "Range", "Hit", "Damage"].map(x => h("th", null, x)))), h("tbody", null, rows, unarmed)),
-			cantrips.length ? h("div", {class: "ve-mt-2"}, h("div", {class: "cs5e-sub"}, "Cantrips"), h("div", null, cantrips.map(sp => h("span", {class: "cs5e-inline"}, U.link("spell", sp))))) : null,
+			cantrips.length ? h("div", {class: "ve-mt-1 ve-small"}, h("b", null, "Cantrips: "), cantrips.map(sp => h("span", {class: "cs5e-inline"}, U.link("spell", sp)))) : null,
 			spellAtk,
-			h("div", {class: "ve-mt-2"}, h("div", {class: "cs5e-sub"}, "Actions in Combat"),
-				U.str("{@action Attack|XPHB}, {@action Dash|XPHB}, {@action Disengage|XPHB}, {@action Dodge|XPHB}, {@action Help|XPHB}, {@action Hide|XPHB}, {@action Influence|XPHB}, {@action Magic|XPHB}, {@action Ready|XPHB}, {@action Search|XPHB}, {@action Study|XPHB}, {@action Utilize|XPHB}", "div", "ve-small")));
+			all.some(a => a.kind === "action") ? h("div", {class: "cs5e-sub2 ve-mt-2"}, "Features") : null,
+		]));
+		if (show("bonus")) out.append(group("bonus", "Bonus Actions") || (f === "bonus" ? h("div", {class: "ve-muted ve-mt-2"}, "No bonus actions.") : ""));
+		if (show("reaction")) out.append(group("reaction", "Reactions", [h("div", {class: "ve-small ve-mb-1"}, U.str("{@action Opportunity Attack|XPHB}"))]));
+		if (show("other")) out.append(group("other", "Other (limited use)") || (f === "other" ? h("div", {class: "ve-muted ve-mt-2"}, "Nothing else.") : ""));
+		if (show("action")) out.append(h("div", {class: "ve-mt-2"}, h("div", {class: "cs5e-sub"}, "Actions in Combat"),
+			U.str("{@action Attack|XPHB}, {@action Dash|XPHB}, {@action Disengage|XPHB}, {@action Dodge|XPHB}, {@action Help|XPHB}, {@action Hide|XPHB}, {@action Influence|XPHB}, {@action Magic|XPHB}, {@action Ready|XPHB}, {@action Search|XPHB}, {@action Study|XPHB}, {@action Utilize|XPHB}", "div", "ve-small")));
+		return out;
 	}
 
 	function spells (c, k) {

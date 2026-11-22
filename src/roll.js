@@ -224,8 +224,24 @@
 
 	let menuEl = null;
 	const closeMenu = () => { menuEl?.remove(); menuEl = null; };
-	document.addEventListener("mousedown", e => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
+	document.addEventListener("mousedown", e => { if (menuEl && !menuEl.contains(e.target) && !menuEl._anchor?.contains(e.target)) closeMenu(); }, true);
 	document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
+
+	/** a small drop-down menu under an element: items = [{label, sub, run}] */
+	CS.dropMenu = (anchor, items) => {
+		const wasOpen = menuEl?._anchor === anchor;
+		closeMenu();
+		if (wasOpen) return;
+		const h = CS.h;
+		menuEl = h("div", {class: "cs5e-menu ve-flex-col"}, items.map(x => h("button", {type: "button", class: "cs5e-menu__i", on: {click: () => { closeMenu(); x.run(); }}},
+			h("div", null, x.label), x.sub ? h("div", {class: "ve-muted ve-small"}, x.sub) : null)));
+		menuEl._anchor = anchor;
+		document.body.append(menuEl);
+		const r = anchor.getBoundingClientRect();
+		const m = menuEl.getBoundingClientRect();
+		menuEl.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - m.width - 8))}px`;
+		menuEl.style.top = `${Math.min(r.bottom + 2, window.innerHeight - m.height - 8)}px`;
+	};
 
 	CS.rollMenu = (evt, specFn, conditional = [], extras = []) => {
 		evt.preventDefault();

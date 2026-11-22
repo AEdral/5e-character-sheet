@@ -40,6 +40,8 @@
 		const base = newChar();
 		for (const [k, v] of Object.entries(base)) if (c[k] == null) c[k] = CS.clone(v);
 		c.settings = {...base.settings, ...(c.settings || {})};
+		// the character-level ASI house rule was removed: ASIs follow the rules (class levels)
+		if ("asiByCharLevel" in c.settings) { delete c.settings.asiByCharLevel; for (const k of Object.keys(c.choices || {})) if (k.startsWith("cl:asi@")) delete c.choices[k]; }
 		if (!c.schema || c.schema < 2) {
 			if (c.abilityMethod) c.settings.abilityMethod = c.abilityMethod;
 			for (const f of c.feats || []) {
@@ -437,9 +439,8 @@
 				for (const w of sp?.weapons || []) this.g.weapons.push(typeof w === "object" ? strip(w.full || w.proficiency) : ({simple: "Simple weapons", martial: "Martial weapons"}[w] || strip(w)));
 				if (ce.i === 0) for (const a of ce.cls.proficiency || []) this.g.saves[a] = from;
 
-				// ability score improvements (by class level, as in the rules; optional house rule: by character level)
+				// ability score improvements: by class level, as in the rules
 				for (const f of feats) {
-					if (settings.asiByCharLevel) break;
 					if (f.kind !== "class" || !/^Ability Score Improvement$/i.test(f.name)) continue;
 					const id = `${sec}:asi@${f.level}`;
 					const ctx = {section: sec, prefix: id, from: `${from} ${f.level}: Ability Score Improvement`, parent: null, level: f.level, feature: f.name};
@@ -498,25 +499,6 @@
 			}
 		}
 
-		/** House rule: ASIs at character levels 4, 8, 12, 16, 19 regardless of class */
-		charLevelAsi () {
-			if (!this.char.settings?.asiByCharLevel) return;
-			const ces = classEntries(this.char);
-			if (!ces.length) return;
-			const one = ces[0].cls.edition === "one";
-			for (const lvl of [4, 8, 12, 16, 19]) {
-				if (lvl > this.level) break;
-				const id = `cl:asi@${lvl}`;
-				const ctx = {section: "cls0", prefix: id, from: `Character level ${lvl}: Ability Score Improvement`, parent: null, level: 0, feature: "Ability Score Improvements (character level)", charLevel: lvl};
-				const val = this.choice({...ctx, id, kind: "asi", edition: ces[0].cls.edition, label: `Character Level ${lvl}: Ability Score Improvement or Feat`});
-				if (val?.mode === "feat") this.featChoice({...ctx, parent: id}, id + ">feat", one ? ["G"] : null, "Feat");
-				else this.ability({...ctx, prefix: id, parent: id}, [
-					{choose: {from: [...CS.ABIL], count: 1, amount: 2}, _label: "+2 to one ability score"},
-					{choose: {from: [...CS.ABIL], count: 2, amount: 1}, _label: "+1 to two ability scores"},
-				], {label: "Ability Scores"});
-			}
-		}
-
 		extraFeats () {
 			for (const f of this.char.extraFeats || []) {
 				const feat = D.getFeat(f);
@@ -540,7 +522,6 @@
 			this.background();
 			this.origin();
 			this.classes();
-			this.charLevelAsi();
 			this.extraFeats();
 			return this;
 		}
@@ -834,6 +815,7 @@
 			attacks: attacks(char, scores, pb),
 			weight, carry: scores.str.total * 15,
 		};
+		CS.actions?.applyMods(char, calc);
 		calc.pending = W.choices.filter(c => isPending(c, calc)).length;
 		calc.riders = damageRiders(char, calc);
 		return calc;

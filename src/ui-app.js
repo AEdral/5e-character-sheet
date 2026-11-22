@@ -50,21 +50,6 @@
 		return [lvl ? `Level ${lvl}` : null, sub?.name ? `${race.name} (${sub.name})` : (race?.name || c.race?.name), cls].filter(Boolean).join(" · ") || "New character";
 	}
 
-	/** "Import" drop-down (a <details> element: no global listeners, stays inside the drawer) */
-	function importMenu (fileIn, pdfIn) {
-		const dd = h("details", {class: "cs5e-dd"});
-		const item = (label, sub, input) => h("button", {type: "button", class: "cs5e-menu__i", on: {click: () => { dd.open = false; input.click(); }}},
-			h("div", null, label), h("div", {class: "ve-muted ve-small"}, sub));
-		dd.append(
-			h("summary", {class: "ve-btn ve-btn-default", title: "Import a character"}, "Import \u25be"),
-			h("div", {class: "cs5e-dd__menu"},
-				item("From a file (.json)", "A character exported from this extension", fileIn),
-				item("From D&D Beyond (PDF)", "Character sheet \u2192 Export to PDF on dndbeyond.com", pdfIn)));
-		const close = e => { if (dd.open && !dd.contains(e.target)) dd.open = false; };
-		dd.addEventListener("toggle", () => { if (dd.open) document.addEventListener("click", close, true); else document.removeEventListener("click", close, true); });
-		return dd;
-	}
-
 	async function renderDrawer () {
 		const a = S.auth;
 		const list = h("div", {class: "cs5e-drawer__list"});
@@ -75,9 +60,11 @@
 				h("h4", {class: "ve-m-0"}, "My Characters"),
 				U.btn(h("span", {class: "glyphicon glyphicon-remove"}), () => app.toggleDrawer(false), "ve-btn-default ve-btn-xs", {title: "Close"})),
 			h("div", {class: "cs5e-drawer__auth"}, ...cloudStatus(a)),
-			h("div", {class: "ve-flex-v-center cs5e-gap ve-mb-2"},
-				U.btn("+ Create a Character", newCharacter, "ve-btn-primary"),
-				importMenu(fileIn, pdfIn), fileIn, pdfIn),
+			h("div", {class: "cs5e-dactions"},
+				U.btn("+ Create a Character", newCharacter, "ve-btn-primary cs5e-dactions__new"),
+				U.btn("Import file (.json)", () => fileIn.click(), "ve-btn-default ve-btn-sm", {title: "Import a character exported from this extension"}),
+				U.btn("Import from D&D Beyond", () => pdfIn.click(), "ve-btn-default ve-btn-sm", {title: "On dndbeyond.com: Character Sheet \u2192 Export to PDF, then pick the PDF here"}),
+				fileIn, pdfIn),
 			list,
 			settingsBox(),
 		);
